@@ -5,7 +5,9 @@ import android.content.DialogInterface;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -15,49 +17,60 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * MEMORIAL DA MINHA VIDA — os fatos e acontecimentos do SE, organizados
- * nas quatro fases da jornada:
- *   1. Antes do concurso CESD
- *   2. Durante o concurso
- *   3. Após formado — Soldado Especialista
- *   4. Até a minha baixa
- *
- * Cada fase guarda uma lista de fatos (título, data, local, descrição),
- * em ordem de data. Tudo fica no cofre criptografado e vai no backup.
+ * MEMORIAL DA MINHA VIDA (v1.3) — as histórias militares do SE em 5 trilhas
+ * com cor própria:
+ *   1. Antes do concurso CESD (azul)
+ *   2. Durante o concurso (ouro)
+ *   3. Após formado — Soldado Especialista (verde FAB)
+ *   4. Até a minha baixa (cinza-azulado)
+ *   5. Passagem pelo Exército (verde-oliva)
+ * E a LINHA DO TEMPO, que mistura todos os fatos em ordem cronológica
+ * com pontos coloridos por trilha.
  */
 public class AtividadeMemorialVida extends AtividadeBase {
 
-    static final String[] FASES = {
+    static final String[] TRILHAS = {
             "Antes do concurso CESD",
             "Durante o concurso",
             "Após formado — Soldado Especialista",
-            "Até a minha baixa"
+            "Até a minha baixa",
+            "Passagem pelo Exército"
     };
 
-    static final String[] FASES_SUB = {
+    static final String[] TRILHAS_SUB = {
             "Família, estudos, trabalho e a decisão de servir.",
-            "Inscrição, provas, aprovação e o curso de especialização.",
-            "Serviço nas Organizações Militares, funções, missões e conquistas.",
-            "Licenciamento do serviço ativo e a despedida da farda."
+            "Inscrição, provas, aprovação e o curso no CESD.",
+            "OMs, funções, missões e conquistas na FAB.",
+            "Licenciamento do serviço ativo e a despedida da farda.",
+            "Sua jornada nas unidades do Exército Brasileiro."
     };
 
-    private static final String[] CHAVES = {"fase0", "fase1", "fase2", "fase3"};
+    static final int[] TRILHAS_COR = {
+            COR_FASE1, COR_FASE2, COR_FASE3, COR_FASE4, COR_EXERCITO
+    };
+
+    private static final String[] CHAVES = {"fase0", "fase1", "fase2", "fase3", "exercito"};
 
     private JSONObject memorial = new JSONObject();
-    private int faseAtual = -1; // -1 = lista de fases; 0..3 = fatos da fase
+    private int modo = 0;      // 0 = trilhas, 1 = fatos de uma trilha, 2 = linha do tempo
+    private int trilhaAtual = 0;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (!Cofre.sessaoAberta()) { ir(AtividadeAcesso.class); finish(); return; }
-        if (state != null) faseAtual = state.getInt("fase", -1);
+        if (state != null) {
+            modo = state.getInt("modo", 0);
+            trilhaAtual = state.getInt("trilha", 0);
+        }
         carregar();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
-        out.putInt("fase", faseAtual);
+        out.putInt("modo", modo);
+        out.putInt("trilha", trilhaAtual);
     }
 
     private void carregar() {
@@ -80,152 +93,287 @@ public class AtividadeMemorialVida extends AtividadeBase {
         }
     }
 
-    private JSONArray fatosDaFase(int fase) {
-        JSONArray a = memorial.optJSONArray(CHAVES[fase]);
+    private JSONArray fatosDaTrilha(int trilha) {
+        JSONArray a = memorial.optJSONArray(CHAVES[trilha]);
         return a == null ? new JSONArray() : a;
     }
 
-    // ------------------------------------------------------------------
-    // Visão 1: as quatro fases
+    private int totalFatos() {
+        int total = 0;
+        for (int i = 0; i < TRILHAS.length; i++) total += fatosDaTrilha(i).length();
+        return total;
+    }
+
     // ------------------------------------------------------------------
 
     private void montar() {
-        if (faseAtual < 0) montarFases();
-        else montarFase(faseAtual);
+        if (modo == 0) montarTrilhas();
+        else if (modo == 1) montarTrilha(trilhaAtual);
+        else montarLinhaDoTempo();
     }
 
-    private void montarFases() {
+    private void montarTrilhas() {
         ScrollView rolagem = tela("Memorial da minha vida",
-                "Os fatos e acontecimentos da sua jornada, nas quatro fases da causa CESD. "
-                        + "Toque numa fase para registrar.");
+                "Registre suas histórias militares nas 5 trilhas e veja tudo junto na linha do tempo.");
         LinearLayout coluna = coluna(rolagem);
 
-        for (int i = 0; i < FASES.length; i++) {
-            final int fase = i;
-            JSONArray fatos = fatosDaFase(fase);
-            LinearLayout cartao = cartao();
+        int total = totalFatos();
+        LinearLayout resumo = cartao();
+        TextView grande = new TextView(this);
+        grande.setText(total == 0 ? "Comece a sua história" : total
+                + (total == 1 ? " fato registrado" : " fatos registrados"));
+        grande.setTextColor(AZUL_MARINHA);
+        grande.setTextSize(19);
+        grande.setTypeface(Typeface.DEFAULT_BOLD);
+        resumo.addView(grande);
+        TextView detalhe = new TextView(this);
+        detalhe.setText("Cada fato guarda título, data, local e a sua narrativa — criptografados.");
+        detalhe.setTextColor(CINZA_TEXTO);
+        detalhe.setTextSize(12.5f);
+        detalhe.setPadding(0, px(2), 0, 0);
+        resumo.addView(detalhe);
+        coluna.addView(resumo, largura());
 
-            TextView numero = new TextView(this);
-            numero.setText("FASE " + (i + 1));
-            numero.setTextColor(OURO);
-            numero.setTextSize(11);
-            numero.setTypeface(Typeface.DEFAULT_BOLD);
-            cartao.addView(numero);
+        View linhaDoTempo = botao("★  Ver minha linha do tempo", true);
+        linhaDoTempo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                modo = 2;
+                montar();
+            }
+        });
+        coluna.addView(linhaDoTempo, largura());
 
+        for (int i = 0; i < TRILHAS.length; i++) {
+            final int trilha = i;
+            JSONArray fatos = fatosDaTrilha(trilha);
+            LinearLayout externo = cartaoFaixa(TRILHAS_COR[trilha]);
+            LinearLayout c = conteudoFaixa(externo);
+            c.setOrientation(LinearLayout.VERTICAL);
+
+            LinearLayout topo = new LinearLayout(this);
+            topo.setOrientation(LinearLayout.HORIZONTAL);
+            topo.setGravity(Gravity.CENTER_VERTICAL);
+            View emblema = emblema(trilha == 4 ? "EX" : String.valueOf(trilha + 1), TRILHAS_COR[trilha]);
+            LinearLayout.LayoutParams lpE = new LinearLayout.LayoutParams(px(34), px(34));
+            lpE.rightMargin = px(10);
+            topo.addView(emblema, lpE);
             TextView t = new TextView(this);
-            t.setText(FASES[i]);
+            t.setText(TRILHAS[trilha]);
             t.setTextColor(AZUL_MARINHA);
-            t.setTextSize(16);
+            t.setTextSize(15.5f);
             t.setTypeface(Typeface.DEFAULT_BOLD);
-            cartao.addView(t);
+            topo.addView(t, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            c.addView(topo);
 
             TextView s = new TextView(this);
-            s.setText(FASES_SUB[i]);
+            s.setText(TRILHAS_SUB[trilha]);
             s.setTextColor(CINZA_TEXTO);
-            s.setTextSize(13);
-            cartao.addView(s);
+            s.setTextSize(12.5f);
+            s.setPadding(0, px(3), 0, 0);
+            c.addView(s);
 
             TextView contagem = new TextView(this);
             contagem.setText(fatos.length() == 0
-                    ? "Nenhum fato registrado — toque para começar"
-                    : fatos.length() + (fatos.length() == 1 ? " fato registrado" : " fatos registrados")
-                      + " — toque para abrir");
-            contagem.setTextColor(fatos.length() == 0 ? 0xFF8A9BB5 : AZUL_MEDIO);
+                    ? "Toque para registrar o primeiro fato"
+                    : fatos.length() + (fatos.length() == 1 ? " fato — toque para abrir"
+                                                            : " fatos — toque para abrir"));
+            contagem.setTextColor(fatos.length() == 0 ? 0xFF8A9BB5 : TRILHAS_COR[trilha]);
             contagem.setTextSize(12);
             contagem.setTypeface(Typeface.DEFAULT_BOLD);
             contagem.setPadding(0, px(6), 0, 0);
-            cartao.addView(contagem);
+            c.addView(contagem);
 
-            cartao.setOnClickListener(new View.OnClickListener() {
+            externo.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    faseAtual = fase;
+                    modo = 1;
+                    trilhaAtual = trilha;
                     montar();
                 }
             });
-            coluna.addView(cartao, largura());
+            coluna.addView(externo, largura());
         }
 
-        TextView nota = texto("Dica: em cada fase, use “Adicionar fato” para registrar o acontecimento "
-                + "com data, local e a sua história. Os fatos aparecem em ordem de data.");
-        nota.setTextSize(12);
-        coluna.addView(nota);
+        TextView dica = texto("As cores identificam cada capítulo: azul (antes), dourado (concurso), "
+                + "verde (FAB), cinza (baixa) e verde-oliva (Exército).");
+        dica.setTextSize(11.5f);
+        coluna.addView(dica);
         setContentView(rolagem);
     }
 
-    // ------------------------------------------------------------------
-    // Visão 2: os fatos de uma fase
-    // ------------------------------------------------------------------
+    private void montarTrilha(final int trilha) {
+        JSONArray fatos = ordenar(fatosDaTrilha(trilha));
+        salvarTrilha(trilha, fatos);
 
-    private void montarFase(final int fase) {
-        JSONArray fatos = ordenar(fatosDaFase(fase));
-        salvarFase(fase, fatos);
-
-        ScrollView rolagem = tela("Fase " + (fase + 1) + " — " + FASES[fase], FASES_SUB[fase]);
+        ScrollView rolagem = tela(TRILHAS[trilha], TRILHAS_SUB[trilha]);
         LinearLayout coluna = coluna(rolagem);
 
-        View voltar = botao("← Voltar às fases", false);
+        View voltar = botao("← Todas as trilhas", false);
         voltar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                faseAtual = -1;
+                modo = 0;
                 montar();
             }
         });
         coluna.addView(voltar, largura());
 
         if (fatos.length() == 0) {
-            coluna.addView(texto("Nenhum fato nesta fase ainda. Registre o primeiro acontecimento!"));
+            coluna.addView(texto("Nada registrado aqui ainda. Cada história merece ser contada!"));
         }
         for (int i = 0; i < fatos.length(); i++) {
             final int indice = i;
             JSONObject f = fatos.optJSONObject(i);
             if (f == null) continue;
-            LinearLayout cartao = cartao();
+            LinearLayout externo = cartaoFaixa(TRILHAS_COR[trilha]);
+            LinearLayout c = conteudoFaixa(externo);
+            c.setOrientation(LinearLayout.VERTICAL);
             TextView t = new TextView(this);
             t.setText(f.optString("titulo", "(sem título)"));
             t.setTextColor(AZUL_MARINHA);
             t.setTextSize(15);
             t.setTypeface(Typeface.DEFAULT_BOLD);
-            cartao.addView(t);
+            c.addView(t);
             String linha = f.optString("data", "");
             if (!f.optString("local", "").isEmpty()) {
                 linha += (linha.isEmpty() ? "" : " • ") + f.optString("local");
             }
-            if (!linha.isEmpty()) cartao.addView(texto(linha));
+            if (!linha.isEmpty()) {
+                TextView l = texto(linha);
+                l.setTextColor(TRILHAS_COR[trilha]);
+                l.setTypeface(Typeface.DEFAULT_BOLD);
+                l.setTextSize(12.5f);
+                c.addView(l);
+            }
             String desc = f.optString("descricao", "");
-            if (!desc.isEmpty()) cartao.addView(texto(desc));
+            if (!desc.isEmpty()) c.addView(texto(desc));
 
             LinearLayout botoes = new LinearLayout(this);
             botoes.setOrientation(LinearLayout.HORIZONTAL);
             View editar = botao("Editar", false);
             editar.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) { dialogoFato(fase, indice); }
+                public void onClick(View v) { dialogoFato(trilha, indice); }
             });
             View remover = botao("Remover", false);
             remover.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) { removerFato(fase, indice); }
+                public void onClick(View v) { removerFato(trilha, indice); }
             });
             LinearLayout.LayoutParams metade = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            LinearLayout.LayoutParams metade2 = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            metade2.leftMargin = px(6);
             botoes.addView(editar, metade);
-            botoes.addView(remover, metade);
-            cartao.addView(botoes);
-            coluna.addView(cartao, largura());
+            botoes.addView(remover, metade2);
+            c.addView(botoes, largura());
+            coluna.addView(externo, largura());
         }
 
-        View adicionar = botao("Adicionar fato", true);
+        View adicionar = botao("+ Adicionar fato nesta trilha", true);
         adicionar.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) { dialogoFato(fase, -1); }
+            public void onClick(View v) { dialogoFato(trilha, -1); }
         });
         coluna.addView(adicionar, largura());
         setContentView(rolagem);
     }
 
-    /** Ordena por data (string AAAA-MM-DD) e devolve o array ordenado. */
+    private void montarLinhaDoTempo() {
+        ScrollView rolagem = tela("Minha linha do tempo",
+                "Todos os seus fatos, do mais antigo ao mais recente, coloridos por trilha.");
+        LinearLayout coluna = coluna(rolagem);
+
+        View voltar = botao("← Voltar às trilhas", false);
+        voltar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                modo = 0;
+                montar();
+            }
+        });
+        coluna.addView(voltar, largura());
+
+        // junta tudo
+        java.util.List<JSONObject> todos = new java.util.ArrayList<>();
+        java.util.List<Integer> trilhaDe = new java.util.ArrayList<>();
+        for (int trilha = 0; trilha < TRILHAS.length; trilha++) {
+            JSONArray fatos = ordenar(fatosDaTrilha(trilha));
+            for (int i = 0; i < fatos.length(); i++) {
+                todos.add(fatos.optJSONObject(i));
+                trilhaDe.add(trilha);
+            }
+        }
+        // ordena por data (estável, mantendo pares com trilhaDe)
+        Integer[] ordem = new Integer[todos.size()];
+        for (int i = 0; i < ordem.length; i++) ordem[i] = i;
+        java.util.Arrays.sort(ordem, new java.util.Comparator<Integer>() {
+            @Override
+            public int compare(Integer a, Integer b) {
+                int c = todos.get(a).optString("data", "").compareTo(todos.get(b).optString("data", ""));
+                return c != 0 ? c : Integer.compare(trilhaDe.get(a), trilhaDe.get(b));
+            }
+        });
+
+        if (todos.isEmpty()) {
+            coluna.addView(texto("Sua linha do tempo está esperando o primeiro fato. "
+                    + "Escolha uma trilha e comece!"));
+        }
+        LinearLayout trilhaVisual = new LinearLayout(this);
+        trilhaVisual.setOrientation(LinearLayout.VERTICAL);
+        for (int k = 0; k < ordem.length; k++) {
+            int idx = ordem[k];
+            JSONObject f = todos.get(idx);
+            int trilha = trilhaDe.get(idx);
+            LinearLayout cartao = cartao();
+            TextView legenda = new TextView(this);
+            legenda.setText(TRILHAS[trilha].toUpperCase());
+            legenda.setTextColor(TRILHAS_COR[trilha]);
+            legenda.setTextSize(10.5f);
+            legenda.setTypeface(Typeface.DEFAULT_BOLD);
+            legenda.setLetterSpacing(0.08f);
+            cartao.addView(legenda);
+            TextView t = new TextView(this);
+            t.setText(f.optString("titulo", "(sem título)"));
+            t.setTextColor(AZUL_MARINHA);
+            t.setTextSize(15);
+            t.setTypeface(Typeface.DEFAULT_BOLD);
+            t.setPadding(0, px(2), 0, 0);
+            cartao.addView(t);
+            String linha = f.optString("data", "");
+            if (!f.optString("local", "").isEmpty()) {
+                linha += (linha.isEmpty() ? "" : " • ") + f.optString("local");
+            }
+            if (!linha.isEmpty()) {
+                TextView l = texto(linha);
+                l.setTextSize(12.5f);
+                c(l, 0xFF5F718C);
+                cartao.addView(l);
+            }
+            String desc = f.optString("descricao", "");
+            if (!desc.isEmpty()) {
+                TextView d = texto(desc);
+                d.setTextSize(13.5f);
+                cartao.addView(d);
+            }
+            trilhaVisual.addView(itemLinhaDoTempo(TRILHAS_COR[trilha], cartao));
+        }
+        coluna.addView(trilhaVisual, largura());
+
+        TextView fim = texto("★ Fim da linha do tempo — sua história continua sendo escrita.");
+        fim.setGravity(Gravity.CENTER);
+        fim.setTextSize(12);
+        coluna.addView(fim);
+        setContentView(rolagem);
+    }
+
+    private void c(TextView t, int cor) {
+        t.setTextColor(cor);
+    }
+
     private JSONArray ordenar(JSONArray entrada) {
         try {
             java.util.List<JSONObject> lista = new java.util.ArrayList<>();
@@ -244,15 +392,15 @@ public class AtividadeMemorialVida extends AtividadeBase {
         }
     }
 
-    private void salvarFase(int fase, JSONArray fatos) {
+    private void salvarTrilha(int trilha, JSONArray fatos) {
         try {
-            memorial.put(CHAVES[fase], fatos);
+            memorial.put(CHAVES[trilha], fatos);
         } catch (Exception ignored) {
         }
     }
 
-    private void dialogoFato(final int fase, final int indice) {
-        JSONArray fatos = fatosDaFase(fase);
+    private void dialogoFato(final int trilha, final int indice) {
+        JSONArray fatos = fatosDaTrilha(trilha);
         final JSONObject original = indice >= 0 && indice < fatos.length() ? fatos.optJSONObject(indice) : null;
 
         LinearLayout formulario = new LinearLayout(this);
@@ -260,11 +408,11 @@ public class AtividadeMemorialVida extends AtividadeBase {
         int p = px(18);
         formulario.setPadding(p, p, p, 0);
 
-        final EditText titulo = campo("Fato/acontecimento (ex.: Aprovação no concurso)");
+        final EditText titulo = campo("Fato/acontecimento (ex.: Aprovação no concurso do CESD)");
         final EditText data = campo("Data (AAAA-MM-DD)");
         data.setInputType(InputType.TYPE_CLASS_DATETIME);
-        final EditText local = campo("Local (cidade, OM…) — opcional");
-        final EditText descricao = campoMultilinha("Conte esse fato com suas palavras.", 4);
+        final EditText local = campo("Unidade/Cidade (ex.: 3ª Cia — Exército; CESD — FAB)");
+        final EditText descricao = campoMultilinha("Conte essa história com suas palavras.", 4);
         formulario.addView(titulo);
         formulario.addView(data, largura());
         formulario.addView(local, largura());
@@ -279,19 +427,19 @@ public class AtividadeMemorialVida extends AtividadeBase {
 
         new AlertDialog.Builder(this)
                 .setTitle((indice >= 0 ? "Editar fato" : "Novo fato")
-                        + " — Fase " + (fase + 1))
+                        + " — " + TRILHAS[trilha])
                 .setView(formulario)
                 .setPositiveButton("Salvar", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
-                        salvarFato(fase, indice, titulo, data, local, descricao);
+                        salvarFato(trilha, indice, titulo, data, local, descricao);
                     }
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
     }
 
-    private void salvarFato(int fase, int indice, EditText titulo, EditText data,
+    private void salvarFato(int trilha, int indice, EditText titulo, EditText data,
                             EditText local, EditText descricao) {
         String t = titulo.getText().toString().trim();
         if (t.length() < 3) {
@@ -304,31 +452,31 @@ public class AtividadeMemorialVida extends AtividadeBase {
             f.put("data", data.getText().toString().trim());
             f.put("local", local.getText().toString().trim());
             f.put("descricao", descricao.getText().toString().trim());
-            JSONArray fatos = fatosDaFase(fase);
+            JSONArray fatos = fatosDaTrilha(trilha);
             if (indice >= 0) fatos.put(indice, f);
             else fatos.put(f);
-            salvarFase(fase, ordenar(fatos));
+            salvarTrilha(trilha, ordenar(fatos));
             persistir();
-            aviso(indice >= 0 ? "Fato atualizado." : "Fato registrado no memorial ✓");
+            aviso(indice >= 0 ? "Fato atualizado." : "História registrada no memorial ✓");
         } catch (Exception e) {
             aviso("Não foi possível salvar o fato.");
         }
         montar();
     }
 
-    private void removerFato(final int fase, final int indice) {
+    private void removerFato(final int trilha, final int indice) {
         new AlertDialog.Builder(this)
                 .setTitle("Excluir o fato?")
                 .setMessage("Este fato será apagado do memorial.")
                 .setPositiveButton("Excluir", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
-                        JSONArray atual = fatosDaFase(fase);
+                        JSONArray atual = fatosDaTrilha(trilha);
                         JSONArray nova = new JSONArray();
                         for (int i = 0; i < atual.length(); i++) {
                             if (i != indice) nova.put(atual.opt(i));
                         }
-                        salvarFase(fase, nova);
+                        salvarTrilha(trilha, nova);
                         persistir();
                         montar();
                         aviso("Fato excluído.");
@@ -340,8 +488,8 @@ public class AtividadeMemorialVida extends AtividadeBase {
 
     @Override
     public void onBackPressed() {
-        if (faseAtual >= 0) {
-            faseAtual = -1;
+        if (modo == 2 || modo == 1) {
+            modo = 0;
             montar();
         } else {
             super.onBackPressed();
