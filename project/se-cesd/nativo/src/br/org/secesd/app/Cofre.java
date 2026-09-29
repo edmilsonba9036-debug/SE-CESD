@@ -141,6 +141,9 @@ public final class Cofre {
         c.put("ivDados", Base64.encodeToString(ivDados, Base64.NO_WRAP));
         c.put("dados", Base64.encodeToString(blob, Base64.NO_WRAP));
         gravar(ctx, c.toString());
+        // marca que há algo novo para o backup automático levar ao Drive
+        ctx.getSharedPreferences("drive-backup", Context.MODE_PRIVATE)
+                .edit().putBoolean("pendenteEnviar", true).apply();
     }
 
     /** Substitui o cofre inteiro (restauração de backup). A sessão é encerrada. */

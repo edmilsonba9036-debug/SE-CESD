@@ -17,11 +17,14 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
 
     private TextView status;
     private DriveBackup drive;
+    private android.widget.Button botaoAuto;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (!Cofre.sessaoAberta()) { ir(AtividadeAcesso.class); finish(); return; }
+
+        drive = new DriveBackup(this, this);
 
         ScrollView rolagem = tela("Backup no Google Drive",
                 "O cofre vai criptografado (AES-GCM com a sua senha) para a pasta “SE • CESD” do seu Drive. "
@@ -56,6 +59,28 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         });
         coluna.addView(navegador, largura());
 
+        botaoAuto = botao(rotuloAuto(), false);
+        botaoAuto.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                boolean novo = !DriveBackup.autoAtivo(AtividadeBackup.this);
+                DriveBackup.definirAuto(AtividadeBackup.this, novo);
+                botaoAuto.setText(rotuloAuto());
+                aviso(novo ? "Backup automático ATIVADO: o app envia sozinho ao sair das telas."
+                           : "Backup automático DESATIVADO: envie pelo botão quando quiser.");
+            }
+        });
+        coluna.addView(botaoAuto, largura());
+
+        long ultimo = DriveBackup.ultimoBackup(this);
+        if (ultimo > 0) {
+            String quando = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                    .format(new java.util.Date(ultimo));
+            TextView su = texto("Último backup enviado: " + quando);
+            su.setTextSize(12);
+            coluna.addView(su);
+        }
+
         status = new TextView(this);
         status.setTextColor(CINZA_TEXTO);
         status.setTextSize(14);
@@ -63,9 +88,9 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         coluna.addView(status);
 
         coluna.addView(texto("\nArquivo único SE-CESD-backup.json: cada envio atualiza o mesmo arquivo, "
-                + "mantendo só a versão mais recente. Nada é legível sem a sua senha; em trânsito há TLS."));
+                + "mantendo só a versão mais recente. Com o automático LIGADO, qualquer alteração "
+                + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
 
-        drive = new DriveBackup(this, this);
         setContentView(rolagem);
     }
 
@@ -116,6 +141,12 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         }
     }
 
+
+    private String rotuloAuto() {
+        return DriveBackup.autoAtivo(this)
+                ? "Backup automático: LIGADO (envia ao sair das telas)"
+                : "Backup automático: DESLIGADO";
+    }
 
     /**
      * Plano B: configura o cliente OAuth do tipo DESKTOP criado no Google

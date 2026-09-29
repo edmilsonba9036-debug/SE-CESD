@@ -2,6 +2,7 @@ package br.org.secesd.app;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -158,5 +159,33 @@ public abstract class AtividadeBase extends Activity {
 
     protected void ir(Class<?> destino) {
         startActivity(new Intent(this, destino));
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        tentarBackupAutomatico();
+    }
+
+    /**
+     * Backup automático: ao sair da tela, se houver mudanças pendentes e a
+     * conexão com o Drive já estiver configurada, envia sozinho (o token é
+     * renovado sem perguntar nada). Falha em silêncio — só avisa se der erro.
+     */
+    private void tentarBackupAutomatico() {
+        try {
+            if (!Cofre.sessaoAberta()) return;
+            SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
+            if (!p.getBoolean("autoBackup", true)) return;
+            if (!p.getBoolean("pendenteEnviar", false)) return;
+            long agora = System.currentTimeMillis();
+            if (agora - p.getLong("tentativaAuto", 0) < 60000) return; // 1x por minuto, no máximo
+            DriveBackup sonda = new DriveBackup(this, null);
+            if (!sonda.prontoParaEnviar()) return; // ainda não conectou: nada a fazer
+            p.edit().putLong("tentativaAuto", agora).apply();
+            sonda.enviarAutomatico(Cofre.exportar(this));
+        } catch (Exception e) {
+            // o automático nunca deve atrapalhar o uso do app
+        }
     }
 }

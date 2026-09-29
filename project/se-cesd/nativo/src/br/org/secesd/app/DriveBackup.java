@@ -73,15 +73,42 @@ public class DriveBackup {
     // ------------------------------------------------------------------
 
     public void conectar() {
-        iniciar(Acao.CONECTAR, null);
+        iniciar(Acao.CONECTAR, null, false);
     }
 
     public void enviar(String cofreJson) {
-        iniciar(Acao.ENVIAR, cofreJson);
+        iniciar(Acao.ENVIAR, cofreJson, false);
+    }
+
+    /** Envio automático (sem mensagens de progresso; só o resultado final). */
+    public void enviarAutomatico(String cofreJson) {
+        iniciar(Acao.ENVIAR, cofreJson, true);
+    }
+
+    /** Automático ligado? (padrão: ligado) */
+    public static boolean autoAtivo(Activity a) {
+        return a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getBoolean("autoBackup", true);
+    }
+
+    public static void definirAuto(Activity a, boolean ligado) {
+        a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .edit().putBoolean("autoBackup", ligado).apply();
+    }
+
+    /** Há conexão pronta (conta escolhida ou cliente do navegador configurado)? */
+    public boolean prontoParaEnviar() {
+        return browserConfigurado() || conta() != null;
+    }
+
+    /** Data/hora do último backup bem-sucedido (0 = nunca). */
+    public static long ultimoBackup(Activity a) {
+        return a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getLong("ultimoBackup", 0);
     }
 
     public void restaurar() {
-        iniciar(Acao.RESTAURAR, null);
+        iniciar(Acao.RESTAURAR, null, false);
     }
 
     /** Chamar a partir de Activity.onActivityResult. Devolve true se era do Drive. */
@@ -107,7 +134,10 @@ public class DriveBackup {
     // Fluxo
     // ------------------------------------------------------------------
 
-    private synchronized void iniciar(Acao acao, String payload) {
+    private boolean silencioso;
+
+    private synchronized void iniciar(Acao acao, String payload, boolean quieto) {
+        silencioso = quieto;
         pendente = acao;
         payloadPendente = payload;
         token = null;
@@ -160,6 +190,7 @@ public class DriveBackup {
     }
 
     private void avisar(final String msg, final boolean ok) {
+        if (ouvinte == null) return;
         atividade.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -538,7 +569,7 @@ public class DriveBackup {
 
     /** Ação pendente… */
     private void executarEnvio(String cofreJson) throws Exception {
-        avisar("Preparando o backup…", true);
+        if (!silencioso) avisar("Preparando o backup…", true);
         JSONObject conteudo = new JSONObject();
         conteudo.put("formato", "se-cesd-backup");
         conteudo.put("versao", 1);
@@ -553,7 +584,9 @@ public class DriveBackup {
                 String pastaId = garantirPasta(t);
                 String arquivoId = localizarArquivo(t, pastaId);
                 final boolean novo = arquivoId == null;
-                avisar(novo ? "Criando o backup no Google Drive…" : "Atualizando o backup no Google Drive…", true);
+                if (!silencioso) {
+                    avisar(novo ? "Criando o backup no Google Drive…" : "Atualizando o backup no Google Drive…", true);
+                }
                 HttpURLConnection conn;
                 if (novo) {
                     JSONObject meta = new JSONObject();
@@ -575,7 +608,13 @@ public class DriveBackup {
                 String corpo = ler(conn, codigo);
                 conn.disconnect();
                 if (codigo >= 200 && codigo < 300) {
-                    avisar("Backup salvo no Google Drive ✓", true);
+                    atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                            .edit()
+                            .putBoolean("pendenteEnviar", false)
+                            .putLong("ultimoBackup", System.currentTimeMillis())
+                            .apply();
+                    avisar(silencioso ? "Backup automático enviado ao Drive ✓"
+                                      : "Backup salvo no Google Drive ✓", true);
                     return;
                 }
                 if (codigo == 401 && tentativa == 0) { token = null; continue; }
@@ -624,6 +663,7 @@ public class DriveBackup {
         }
         final String cofre = dados;
         avisar("Backup de " + conteudo.optString("criadoEm", "?") + " pronto para aplicar.", true);
+        if (ouvinte == null) return;
         atividade.runOnUiThread(new Runnable() {
             @Override
             public void run() {
