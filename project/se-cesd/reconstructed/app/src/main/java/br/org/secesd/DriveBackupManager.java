@@ -1,24 +1,20 @@
 package br.org.secesd;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.accounts.AccountManagerCallback;
+import android.accounts.AccountManagerFuture;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
-
-import com.google.android.gms.auth.GoogleAuthException;
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.UserRecoverableAuthException;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.common.api.Scope;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -41,30 +37,36 @@ import java.util.concurrent.Executors;
 /**
  * Backup do SE • CESD no Google Drive.
  *
- * Fluxo (cliente OAuth tipo Android — sem redirect no navegador):
- *   1. Autorização: GoogleSignIn.requestPermissions(...) com o escopo drive.file.
- *      O Play Services valida sozinho o pacote + SHA-1 registrados no Google Cloud.
- *   2. Token: GoogleAuthUtil.getToken(conta, "oauth2:" + escopo), renovado quando
- *      o Drive responde 401.
+ * Autorização SEM biblioteca externa (só o framework Android):
+ *   1. Conta: AccountManager.newChooseAccountIntent — o seletor de contas
+ *      Google do sistema (quem responde é o autenticador com.google do
+ *      Google Play Services, que valida o pacote + SHA-1 no Google Cloud).
+ *   2. Token: AccountManager.getAuthToken(conta, "oauth2:" + escopo) — o
+ *      consentimento (escopo drive.file) é desenhado pelo próprio Play
+ *      Services; se faltar consentimento, o Bundle traz KEY_INTENT e o app
+ *      lança a tela e repete a chamada.
  *   3. Arquivo único na pasta "SE • CESD" (criada pelo app):
  *        - primeira vez: POST multipart (files.create)
- *        - depois:       PATCH media no mesmo fileId (o Drive mantém só a versão mais recente)
- *   4. O conteúdo já vai criptografado do app web (registros AES-GCM do cofre
+ *        - depois:       PATCH media no mesmo fileId (só a versão mais recente)
+ *   4. Conteúdo já criptografado pelo app web (registros AES-GCM do cofre
  *      IndexedDB, indecifráveis sem a senha do usuário) + TLS em trânsito.
  *
- * Ponte com o app web: window.SecesoDrive (recebe comandos) e
- * window.SecesoDriveBridge (recebe status e o backup restaurado).
+ * Ponte com o app web: window.SecesoDrive (comandos) e
+ * window.SecesoDriveBridge (status e backup restaurado).
  */
 public class DriveBackupManager {
 
     /** Códigos usados pela MainActivity em startActivityForResult. */
-    public static final int RC_AUTH_PERMISSION = 4202;
-    public static final int RC_RECOVERABLE = 4203;
+    public static final int RC_CONTA = 4204;
+    public static final int RC_CONSENTIMENTO = 4205;
 
-    /** Levantada quando o Google pediu um diálogo extra de permissão. */
-    private static class PrecisaAutorizacao extends IOException {
-        PrecisaAutorizacao() {
-            super("precisa-autorizacao");
+    /** Tipo de conta Google usada pelo seletor e pelo token. */
+    static final String TIPO_CONTA = "com.google";
+
+    /** Levantada quando falta interação do usuário (escolha de conta/consentimento). */
+    private static class PrecisaInteracao extends IOException {
+        PrecisaInteracao() {
+            super("precisa-interacao");
         }
     }
 
@@ -76,8 +78,6 @@ public class DriveBackupManager {
 
     private Acao acaoPendente = Acao.NENHUMA;
     private String payloadPendente;
-
-    private GoogleSignInAccount conta;
     private String tokenEmCache;
 
     public DriveBackupManager(Activity activity, WebView webView) {
@@ -120,20 +120,25 @@ public class DriveBackupManager {
         return new Ponte();
     }
 
-    /** MainActivity → resultado do consentimento do GoogleSignIn. */
-    public void receberResultadoAutorizacao(Intent data) {
+    // ------------------------------------------------------------------
+    // Resultados vindos da MainActivity
+    // ------------------------------------------------------------------
+
+    /** Resultado do seletor de contas do sistema. */
+    public void receberConta(final Intent data) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                String nome = data != null ? data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME) : null;
+                if (TextUtils.isEmpty(nome)) {
+                    falhar("Nenhuma conta escolhida.");
+                    return;
+                }
+                prefs().edit().putString("contaNome", nome).apply();
                 try {
-                    conta = GoogleSignIn.getSignedInAccountFromIntent(data).getResult();
-                    if (conta == null || conta.getAccount() == null) {
-                        falhar("A autorização do Google não foi concluída.");
-                        return;
-                    }
                     executarPendente();
-                } catch (PrecisaAutorizacao e) {
-                    aguardarAutorizacao();
+                } catch (PrecisaInteracao e) {
+                    // seguindo no consentimento; nada a fazer aqui
                 } catch (Exception e) {
                     falhar(erroAmigavel(e));
                 }
@@ -141,15 +146,15 @@ public class DriveBackupManager {
         });
     }
 
-    /** MainActivity → resultado do diálogo do UserRecoverableAuthException. */
-    public void receberResultadoRecuperavel(int resultCode, Intent data) {
+    /** Resultado da tela de consentimento do Google. */
+    public void receberConsentimento(Intent data) {
         executor.execute(new Runnable() {
             @Override
             public void run() {
                 try {
                     executarPendente();
-                } catch (PrecisaAutorizacao e) {
-                    aguardarAutorizacao();
+                } catch (PrecisaInteracao e) {
+                    aguardarInteracao();
                 } catch (Exception e) {
                     falhar(erroAmigavel(e));
                 }
@@ -169,16 +174,13 @@ public class DriveBackupManager {
             @Override
             public void run() {
                 try {
-                    if (!servicosOk()) {
-                        falhar("Este aparelho não tem o Google Play Services, necessário para o backup no Drive.");
+                    if (contaAtual() == null) {
+                        pedirConta();
                         return;
                     }
-                    if (!garantirAutorizacao()) {
-                        return; // aguardando o consentimento; continua em receberResultadoAutorizacao
-                    }
                     executarPendente();
-                } catch (PrecisaAutorizacao e) {
-                    aguardarAutorizacao();
+                } catch (PrecisaInteracao e) {
+                    aguardarInteracao();
                 } catch (Exception e) {
                     falhar(erroAmigavel(e));
                 }
@@ -189,15 +191,16 @@ public class DriveBackupManager {
     private void executarPendente() throws Exception {
         Acao acao = acaoPendente;
         if (acao == Acao.BACKUP) {
-            enviarBackup(payloadPendente);
+            String payload = payloadPendente;
             payloadPendente = null;
             acaoPendente = Acao.NENHUMA;
+            enviarBackup(payload);
         } else if (acao == Acao.RESTAURAR) {
+            acaoPendente = Acao.NENHUMA;
             baixarBackup();
-            acaoPendente = Acao.NENHUMA;
         } else if (acao == Acao.CONECTAR) {
-            obterToken(true);
             acaoPendente = Acao.NENHUMA;
+            obterToken(true);
             status("conectar", true, "Conectado ao Google Drive ✓");
         }
     }
@@ -208,60 +211,81 @@ public class DriveBackupManager {
         status("erro", false, mensagem);
     }
 
-    private void aguardarAutorizacao() {
+    private void aguardarInteracao() {
         status("autorizacao", true, "Conclua a autorização no Google para continuar.");
     }
 
     // ------------------------------------------------------------------
-    // Autorização
+    // Conta e token (framework AccountManager)
     // ------------------------------------------------------------------
 
-    private boolean servicosOk() {
-        return GoogleApiAvailability.getInstance()
-                .isGooglePlayServicesAvailable(activity) == ConnectionResult.SUCCESS;
+    private Account contaAtual() {
+        String nome = prefs().getString("contaNome", null);
+        return nome == null ? null : new Account(nome, TIPO_CONTA);
     }
 
-    /** Garante conta autorizada; devolve false se lançou o diálogo do Play Services. */
-    private boolean garantirAutorizacao() throws Exception {
-        if (conta != null && conta.getAccount() != null) {
-            return true;
-        }
-        conta = GoogleSignIn.getLastSignedInAccount(activity);
-        if (conta != null && conta.getAccount() != null) {
-            return true;
-        }
+    /** Abre o seletor de contas Google do sistema (devolve false: aguardando). */
+    private boolean pedirConta() {
         activity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                GoogleSignIn.requestPermissions(
-                        activity,
-                        RC_AUTH_PERMISSION,
-                        GoogleSignIn.getLastSignedInAccount(activity),
-                        new Scope(DriveOAuth.SCOPE));
+                try {
+                    Intent seletor = AccountManager.newChooseAccountIntent(
+                            null, null, new String[]{TIPO_CONTA}, true,
+                            null, null, null, null);
+                    activity.startActivityForResult(seletor, RC_CONTA);
+                } catch (Exception e) {
+                    status("erro", false,
+                            "Este aparelho não tem conta Google nem o Play Services, necessários para o backup.");
+                }
             }
         });
         return false;
     }
 
-    private String obterToken(boolean renovar) throws IOException, GoogleAuthException {
+    /** Obtém o access token; lança PrecisaInteracao quando abre tela do Google. */
+    private String obterToken(boolean renovar) throws IOException {
         if (!renovar && tokenEmCache != null) {
             return tokenEmCache;
         }
+        Account conta = contaAtual();
+        if (conta == null) {
+            pedirConta();
+            throw new PrecisaInteracao();
+        }
+        final AccountManager am = AccountManager.get(activity);
+        final String tipo = "oauth2:" + DriveOAuth.SCOPE;
+        Bundle resultado;
         try {
-            Account account = conta.getAccount();
-            String token = GoogleAuthUtil.getToken(activity, account, "oauth2:" + DriveOAuth.SCOPE);
-            tokenEmCache = token;
-            return token;
-        } catch (UserRecoverableAuthException e) {
-            final Intent intencao = e.getIntent();
+            // activity = null: o KEY_INTENT (se houver) volta no Bundle,
+            // e o app lança a tela com startActivityForResult (determinístico).
+            AccountManagerFuture<Bundle> futuro = am.getAuthToken(
+                    conta, tipo, new Bundle(), null, null, null);
+            resultado = futuro.getResult();
+        } catch (OperationCanceledException e) {
+            throw new IOException("O usuário cancelou a autorização do Google.");
+        } catch (AuthenticatorException e) {
+            throw new IOException("O serviço de contas Google não respondeu. Verifique se o Google Play Services está atualizado.");
+        } catch (IOException e) {
+            throw e;
+        }
+        Intent tela = (Intent) resultado.getParcelable(AccountManager.KEY_INTENT);
+        if (tela != null) {
+            final Intent intent = tela;
             activity.runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    activity.startActivityForResult(intencao, RC_RECOVERABLE);
+                    activity.startActivityForResult(intent, RC_CONSENTIMENTO);
                 }
             });
-            throw new PrecisaAutorizacao();
+            throw new PrecisaInteracao();
         }
+        String token = resultado.getString(AccountManager.KEY_AUTHTOKEN);
+        if (TextUtils.isEmpty(token)) {
+            throw new IOException("O Google não devolveu o token de acesso.");
+        }
+        tokenEmCache = token;
+        return token;
     }
 
     // ------------------------------------------------------------------
@@ -501,8 +525,7 @@ public class DriveBackupManager {
         saida.close();
     }
 
-    private byte[] montarMultipart(String metaJson, byte[] media) throws IOException {
-        String limite = "secesd" + System.currentTimeMillis();
+    private byte[] montarMultipart(String limite, String metaJson, byte[] media) throws IOException {
         ByteArrayOutputStream saida = new ByteArrayOutputStream();
         saida.write(("--" + limite + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n")
                 .getBytes(StandardCharsets.UTF_8));
@@ -511,15 +534,8 @@ public class DriveBackupManager {
                 .getBytes(StandardCharsets.UTF_8));
         saida.write(media);
         saida.write(("\r\n--" + limite + "--\r\n").getBytes(StandardCharsets.UTF_8));
-        byte[] tudo = saida.toByteArray();
-        // O boundary precisa bater com o do cabeçalho — guarda no primeiro byte do objeto
-        // não é possível; então devolvemos via variável de instância simples:
-        limiteAtual = limite;
-        return tudo;
+        return saida.toByteArray();
     }
-
-    /** Boundary usado pelo montarMultipart (definido junto). */
-    private String limiteAtual;
 
     private String lerCorpo(HttpURLConnection conn, int codigo) throws IOException {
         InputStream fluxo = codigo >= 200 && codigo < 300 ? conn.getInputStream() : conn.getErrorStream();
@@ -586,9 +602,6 @@ public class DriveBackupManager {
     }
 
     private String erroAmigavel(Exception e) {
-        if (e instanceof UserRecoverableAuthException) {
-            return "Faltou permitir o acesso no Google.";
-        }
         String m = e.getMessage();
         if (m != null && m.contains("HTTP 403")) {
             return "O Google recusou a operação (403). Confira se a Google Drive API está ativa e se o escopo drive.file está na tela de consentimento do projeto.";
@@ -596,10 +609,7 @@ public class DriveBackupManager {
         if (m != null && m.startsWith("HTTP ")) {
             return "O Google recusou a operação (" + enxugar(m) + ").";
         }
-        return "Sem conexão com o Google Drive. Verifique a internet e tente novamente.";
-    }
-}
-
-        return "Sem conexão com o Google Drive. Verifique a internet e tente novamente.";
+        return m != null && !m.isEmpty() ? m
+                : "Sem conexão com o Google Drive. Verifique a internet e tente novamente.";
     }
 }

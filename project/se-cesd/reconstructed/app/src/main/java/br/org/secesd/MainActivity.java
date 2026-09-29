@@ -154,10 +154,10 @@ public class MainActivity extends Activity {
             return;
         }
         if (driveBackupManager == null) return;
-        if (requestCode == DriveBackupManager.RC_AUTH_PERMISSION) {
-            driveBackupManager.receberResultadoAutorizacao(data);
-        } else if (requestCode == DriveBackupManager.RC_RECOVERABLE) {
-            driveBackupManager.receberResultadoRecuperavel(resultCode, data);
+        if (requestCode == DriveBackupManager.RC_CONTA) {
+            driveBackupManager.receberConta(data);
+        } else if (requestCode == DriveBackupManager.RC_CONSENTIMENTO) {
+            driveBackupManager.receberConsentimento(data);
         }
     }
 

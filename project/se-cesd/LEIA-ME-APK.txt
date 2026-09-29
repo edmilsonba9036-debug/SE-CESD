@@ -2,6 +2,27 @@ SE • CESD — APK reconstruído 1.0
 
 ARQUIVO
 SE-CESD.apk
+SE-CESD-1.1-drive.apk (NOVO — inclui o backup no Google Drive)
+
+APK 1.1 COM BACKUP NO DRIVE (gerado em 29/09/2026)
+- Mesmo pacote (br.org.secesd) e MESMA assinatura (SHA-1
+  25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D) — pode ser
+  instalado POR CIMA do 1.0 sem perder os dados do aparelho.
+- Acrescenta o painel “Backup no Google Drive” (nuvem, canto inferior
+  direito): enviar, restaurar (com confirmação em dois toques) e conectar.
+- Arquivo único SE-CESD-backup.json na pasta “SE • CESD” do Drive; conteúdo
+  criptografado (AES-GCM pela senha do usuário) antes de sair do aparelho.
+- Autorização sem navegador: seletor de contas e consentimento do Google
+  pelo framework Android (AccountManager) — não usa redirect, então não
+  sofre os erros “Access blocked” dos fluxos de navegador.
+- Observação de empacotamento: o AndroidManifest/resources deste APK foram
+  preservados byte a byte do 1.0 (sem recompilar recursos), por isso os
+  metadados internos de versão seguem “1.0 (1)”; o conteúdo corresponde à
+  integração 1.1 descrita acima e no código-fonte (reconstructed/).
+- Verificações realizadas: assinatura v1+v2 válida (apksigner verify),
+  certificado SHA-1 conferido contra o debug.keystore, classes.dex gerado
+  das fontes em reconstructed/ (javac AOSP 1.8 + d8 1.5.13), index.html com
+  a ponte incluída. Teste em aparelho físico segue recomendado abaixo.
 
 ESTA VERSÃO
 Este APK foi reconstruído a partir do site público fornecido e contém a página web principal incorporada localmente em um WebView Android. O aplicativo inclui JavaScript, armazenamento local do site, Web Crypto, IndexedDB/localStorage, seletor de arquivos e suporte básico a downloads.
@@ -42,11 +63,11 @@ cliente. Resultados:
   para clientes Android/iOS; guia oficial "Loopback IP Address flow
   Migration Guide").
 CONCLUSÃO: fluxo por navegador (Custom Tabs) NÃO é possível com este cliente.
-O caminho oficial para cliente tipo Android é o Google Play Services:
-GoogleSignIn.requestPermissions (consentimento desenhado pelo Play Services)
-+ GoogleAuthUtil.getToken (emissão/renovação do access token internamente),
-com a dependência play-services-auth no build.gradle. O Play Services valida
-sozinho pacote + SHA-1. Constantes em DriveOAuth.java.
+O caminho oficial para cliente tipo Android é o Play Services do aparelho,
+acessado direto pelo framework Android (AccountManager/AccountPicker) — sem
+biblioteca gms e sem navegador: o consentimento é desenhado pelo Google e o
+pacote + SHA-1 são validados pelo serviço de contas. Constantes em
+DriveOAuth.java; implementação em DriveBackupManager.java.
 ALTERNATIVA (se um dia quiser fluxo por navegador): criar no mesmo projeto um
 segundo cliente OAuth do tipo "App de desktop" — loopback continua suportado
 para desktop — e usar Custom Tabs + PKCE com redirect http://127.0.0.1:porta.
@@ -84,15 +105,15 @@ Como o cliente OAuth é do tipo Android, o fluxo usa o GOOGLE PLAY SERVICES
 
 NOVIDADES DO CÓDIGO (reconstructed/)
   DriveOAuth.java           — client_id, escopo, nomes de pasta/arquivo, REST v3.
-  DriveBackupManager.java   — autorização, upload (create/PATCH), download,
-                              retry em 401 e erros amigáveis.
+  DriveBackupManager.java   — autorização (AccountManager/AccountPicker),
+                              upload (create/PATCH), download, retry em 401
+                              e erros amigáveis.
   MainActivity.java         — injeta a ponte window.SecesoDrive no WebView e
                               trata os resultados de autorização.
   assets/web/drive-bridge.js — painel flutuante “Backup no Google Drive”,
                               lê/grava o cofre IndexedDB, base64 ida e volta.
-  app/build.gradle          — play-services-auth 20.7.0; versionCode 2 (1.1).
-  Observação: os APKs .apk incluídos neste pacote ainda são da versão 1.0;
-  gere o novo APK recompilando esta pasta para ter o backup no Drive.
+  app/build.gradle          — sem dependências externas; versionCode 2 (1.1).
+  APK gerado: SE-CESD-1.1-drive.apk (ver detalhes no topo deste arquivo).
 
 REQUISITOS PARA O BACKUP FUNCIONAR
   - Aparelho com Google Play Services (qualquer Android com Play Store).

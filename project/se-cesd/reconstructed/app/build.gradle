@@ -28,3 +28,9 @@ android {
         }
     }
 }
+
+dependencies {
+    // Nenhuma dependência externa: a autorização do Drive usa o framework
+    // AccountManager/AccountPicker (o consentimento é do Play Services do
+    // aparelho, sem biblioteca gms e sem fluxo de navegador).
+}
