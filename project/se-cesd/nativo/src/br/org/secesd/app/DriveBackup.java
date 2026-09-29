@@ -5,8 +5,12 @@ import android.accounts.AccountManager;
 import android.accounts.AccountManagerCallback;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.DocumentsContract;
 import android.os.Bundle;
 
 import org.json.JSONException;
@@ -670,6 +674,164 @@ public class DriveBackup {
                 ouvinte.restaurado(cofre);
             }
         });
+    }
+
+
+    // ------------------------------------------------------------------
+    // Pasta escolhida pelo usuário (SAF/Storage Access Framework)
+    // ------------------------------------------------------------------
+
+    private SharedPreferences prefs() {
+        return atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE);
+    }
+
+    /** Há pasta escolhida no seletor (Drive ou outro local)? */
+    public boolean temSaf() {
+        return !prefs().getString("safPastaUri", "").isEmpty();
+    }
+
+    private Uri safPasta() {
+        return Uri.parse(prefs().getString("safPastaUri", ""));
+    }
+
+    /** Guarda (ou limpa, com null) a pasta escolhida. */
+    public void definirSafPasta(Uri uri) {
+        SharedPreferences.Editor e = prefs().edit();
+        if (uri == null) {
+            e.remove("safPastaUri");
+        } else {
+            e.putString("safPastaUri", uri.toString());
+        }
+        e.apply();
+    }
+
+    /** Nome amigável da pasta escolhida (se o provedor informar). */
+    public String nomeSafPasta() {
+        try {
+            Uri tree = safPasta();
+            String docId = DocumentsContract.getTreeDocumentId(tree);
+            Uri docUri = DocumentsContract.buildDocumentUriUsingTree(tree, docId);
+            Cursor c = atividade.getContentResolver().query(docUri,
+                    new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME},
+                    null, null, null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) return c.getString(0);
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return "Pasta escolhida";
+    }
+
+    /** Envia pela pasta escolhida (sem OAuth — usa o app Drive do aparelho). */
+    private void enviarSaf(String cofreJson) throws IOException {
+        Uri pasta = safPasta();
+        JSONObject conteudo = new JSONObject();
+        try {
+            conteudo.put("formato", "se-cesd-backup");
+            conteudo.put("versao", 1);
+            conteudo.put("criadoEm", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(new Date()));
+            conteudo.put("aparelho", android.os.Build.MODEL == null ? "Android" : android.os.Build.MODEL);
+            conteudo.put("dados", cofreJson);
+        } catch (JSONException e) {
+            throw new IOException("Falha ao montar o backup.");
+        }
+        byte[] bytes = conteudo.toString().getBytes(StandardCharsets.UTF_8);
+        ContentResolver r = atividade.getContentResolver();
+
+        // procura o arquivo já existente na pasta (para atualizar o mesmo)
+        Uri existente = null;
+        try {
+            Uri filhos = DocumentsContract.buildChildDocumentsUriUsingTree(pasta,
+                    DocumentsContract.getTreeDocumentId(pasta));
+            Cursor c = r.query(filhos, new String[]{
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null);
+            if (c != null) {
+                try {
+                    while (c.moveToNext()) {
+                        String nome = c.getString(1);
+                        if (NOME_ARQUIVO.equalsIgnoreCase(nome)) {
+                            existente = DocumentsContract.buildDocumentUriUsingTree(pasta, c.getString(0));
+                            break;
+                        }
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        Uri alvo = existente;
+        if (alvo == null) {
+            alvo = DocumentsContract.createDocument(r, pasta, "application/json", NOME_ARQUIVO);
+        }
+        if (alvo == null) throw new IOException("Não foi possível criar o arquivo na pasta escolhida.");
+        OutputStream saida = r.openOutputStream(alvo, "w");
+        if (saida == null) throw new IOException("A pasta escolhida não permite escrita.");
+        saida.write(bytes);
+        saida.flush();
+        saida.close();
+        prefs().edit()
+                .putBoolean("pendenteEnviar", false)
+                .putLong("ultimoBackup", System.currentTimeMillis())
+                .apply();
+    }
+
+    /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google. */
+    public void enviarSmart(String cofreJson, boolean quieto) {
+        if (temSaf()) {
+            fila.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (!quieto) avisar("Salvando na pasta escolhida…", true);
+                        enviarSaf(cofreJson);
+                        avisar(quieto ? "Backup automático salvo na pasta ✓"
+                                      : "Backup salvo na pasta escolhida ✓", true);
+                    } catch (IOException e) {
+                        avisar(erroAmigavel(e), false);
+                    } catch (Exception e) {
+                        avisar("Falha ao salvar na pasta escolhida.", false);
+                    }
+                }
+            });
+        } else if (quieto) {
+            if (prontoParaEnviar()) iniciar(Acao.ENVIAR, cofreJson, true);
+        } else {
+            enviar(cofreJson);
+        }
+    }
+
+    /** Lê um arquivo de backup escolhido no seletor (restauração). */
+    public String lerBackupDeUri(Uri uri) throws IOException {
+        try {
+            InputStream entrada = atividade.getContentResolver().openInputStream(uri);
+            if (entrada == null) throw new IOException("Não foi possível abrir o arquivo.");
+            ByteArrayOutputStream saida = new ByteArrayOutputStream();
+            byte[] p = new byte[8192];
+            int n;
+            while ((n = entrada.read(p)) != -1) saida.write(p, 0, n);
+            entrada.close();
+            String corpo = saida.toString("UTF-8");
+            JSONObject conteudo = new JSONObject(corpo);
+            if (!"se-cesd-backup".equals(conteudo.optString("formato"))) {
+                throw new IOException("Este arquivo não é um backup do SE • CESD.");
+            }
+            String dados = conteudo.optString("dados", "");
+            if (dados.isEmpty()) throw new IOException("O backup está vazio.");
+            return dados;
+        } catch (IOException e) {
+            throw e;
+        } catch (JSONException e) {
+            throw new IOException("Arquivo de backup inválido.");
+        } catch (Exception e) {
+            throw new IOException("Falha ao ler o arquivo de backup.");
+        }
     }
 
     // ------------------------------------------------------------------

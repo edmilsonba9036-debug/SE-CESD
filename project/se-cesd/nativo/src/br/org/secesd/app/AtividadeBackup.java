@@ -18,6 +18,10 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private TextView status;
     private DriveBackup drive;
     private android.widget.Button botaoAuto;
+    private TextView pastaEscolhida;
+    private View limparPasta;
+    private static final int PEDIR_PASTA = 4404;
+    private static final int PEDIR_ARQUIVO = 4405;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -58,6 +62,55 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
             public void onClick(View v) { dialogoNavegador(); }
         });
         coluna.addView(navegador, largura());
+
+        coluna.addView(titulo("Pasta no Drive (mais simples)"));
+        View escolherPasta = botao("Escolher pasta do backup…", false);
+        escolherPasta.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                try {
+                    startActivityForResult(i, PEDIR_PASTA);
+                } catch (Exception e) {
+                    aviso("Este aparelho não tem o seletor de pastas.");
+                }
+            }
+        });
+        coluna.addView(escolherPasta, largura());
+
+        pastaEscolhida = new TextView(this);
+        pastaEscolhida.setTextSize(13);
+        pastaEscolhida.setPadding(0, px(6), 0, 0);
+        coluna.addView(pastaEscolhida);
+
+        limparPasta = botao("Limpar pasta escolhida", false);
+        limparPasta.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                drive.definirSafPasta(null);
+                mostrarPasta();
+                aviso("Pasta escolhida removida.");
+            }
+        });
+        coluna.addView(limparPasta, largura());
+        mostrarPasta();
+
+        coluna.addView(titulo("Restaurar de um arquivo"));
+        View escolherArquivo = botao("Escolher arquivo de backup…", false);
+        escolherArquivo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                try {
+                    startActivityForResult(i, PEDIR_ARQUIVO);
+                } catch (Exception e) {
+                    aviso("Este aparelho não tem o seletor de arquivos.");
+                }
+            }
+        });
+        coluna.addView(escolherArquivo, largura());
 
         botaoAuto = botao(rotuloAuto(), false);
         botaoAuto.setOnClickListener(new View.OnClickListener() {
@@ -135,12 +188,51 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private void enviar() {
         try {
             String cofre = Cofre.exportar(this);
-            drive.enviar(cofre);
+            drive.enviarSmart(cofre, false);
         } catch (Exception e) {
             aviso("Não foi possível ler o cofre para enviar.");
         }
     }
 
+
+    private void mostrarPasta() {
+        if (pastaEscolhida == null) return;
+        if (drive.temSaf()) {
+            pastaEscolhida.setText("Pasta atual: " + drive.nomeSafPasta()
+                    + "\nO backup desta pasta usa o app Drive do aparelho — sem autorização extra.");
+            pastaEscolhida.setTextColor(0xFF1B5E20);
+            limparPasta.setVisibility(View.VISIBLE);
+        } else {
+            pastaEscolhida.setText("Nenhuma pasta escolhida — o backup usará a conta Google "
+                    + "(pasta “SE • CESD” no Drive).");
+            pastaEscolhida.setTextColor(CINZA_TEXTO);
+            limparPasta.setVisibility(View.GONE);
+        }
+    }
+
+    private void restaurarDeUri(final android.net.Uri uri) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final String cofre = drive.lerBackupDeUri(uri);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            restaurado(cofre);
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            aviso(String.valueOf(e.getMessage()));
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
 
     private String rotuloAuto() {
         return DriveBackup.autoAtivo(this)
@@ -199,6 +291,27 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PEDIR_PASTA) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                android.net.Uri uri = data.getData();
+                try {
+                    int bandeiras = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    getContentResolver().takePersistableUriPermission(uri, bandeiras);
+                } catch (Exception ignored) {
+                }
+                drive.definirSafPasta(uri);
+                mostrarPasta();
+                aviso("Pasta definida: " + drive.nomeSafPasta());
+            }
+            return;
+        }
+        if (requestCode == PEDIR_ARQUIVO) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                restaurarDeUri(data.getData());
+            }
+            return;
+        }
         if (drive != null) drive.onActivityResult(requestCode, data);
     }
 }

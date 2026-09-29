@@ -314,9 +314,9 @@ public abstract class AtividadeBase extends Activity {
             long agora = System.currentTimeMillis();
             if (agora - p.getLong("tentativaAuto", 0) < 60000) return;
             DriveBackup sonda = new DriveBackup(this, null);
-            if (!sonda.prontoParaEnviar()) return;
+            if (!sonda.temSaf() && !sonda.prontoParaEnviar()) return;
             p.edit().putLong("tentativaAuto", agora).apply();
-            sonda.enviarAutomatico(Cofre.exportar(this));
+            sonda.enviarSmart(Cofre.exportar(this), true);
         } catch (Exception e) {
             // silencioso por design
         }
