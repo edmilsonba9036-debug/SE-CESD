@@ -20,6 +20,8 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private android.widget.Button botaoAuto;
     private TextView pastaEscolhida;
     private View limparPasta;
+    private android.widget.Button botaoEscolherPasta;
+    private android.widget.Button botaoPastaConta;
     private static final int PEDIR_PASTA = 4404;
     private static final int PEDIR_ARQUIVO = 4405;
 
@@ -64,8 +66,8 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         coluna.addView(navegador, largura());
 
         coluna.addView(titulo("Pasta no Drive (mais simples)"));
-        View escolherPasta = botao("Escolher pasta do backup…", false);
-        escolherPasta.setOnClickListener(new View.OnClickListener() {
+        botaoEscolherPasta = botao("Escolher pasta do backup…", false);
+        botaoEscolherPasta.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -76,7 +78,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 }
             }
         });
-        coluna.addView(escolherPasta, largura());
+        coluna.addView(botaoEscolherPasta, largura());
 
         pastaEscolhida = new TextView(this);
         pastaEscolhida.setTextSize(13);
@@ -93,6 +95,17 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
             }
         });
         coluna.addView(limparPasta, largura());
+
+        botaoPastaConta = botao(rotuloPastaConta(), false);
+        botaoPastaConta.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { dialogoPastaConta(); }
+        });
+        coluna.addView(botaoPastaConta, largura());
+        TextView dicaPasta = texto("“Trocar pasta” vale para a pasta escolhida no seletor. "
+                + "O nome abaixo vale para o backup pela conta Google (cria ou usa a pasta com esse nome no Drive).");
+        dicaPasta.setTextSize(11.5f);
+        coluna.addView(dicaPasta);
         mostrarPasta();
 
         coluna.addView(titulo("Restaurar de um arquivo"));
@@ -195,8 +208,52 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     }
 
 
+    private String rotuloPastaConta() {
+        return "Pasta da conta Google: " + DriveBackup.pastaContaNome(this);
+    }
+
+    private void dialogoPastaConta() {
+        LinearLayout formulario = new LinearLayout(this);
+        formulario.setOrientation(LinearLayout.VERTICAL);
+        int p = px(18);
+        formulario.setPadding(p, p, p, 0);
+        final android.widget.EditText nome = campo("Nome da pasta no Drive");
+        nome.setText(DriveBackup.pastaContaNome(this));
+        formulario.addView(nome);
+        formulario.addView(texto("Se a pasta já existir no seu Drive com esse nome, o backup usa ela; "
+                + "se não existir, o app cria."));
+        new AlertDialog.Builder(this)
+                .setTitle("Pasta do backup (conta Google)")
+                .setView(formulario)
+                .setPositiveButton("Salvar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        String n = nome.getText().toString().trim();
+                        if (n.isEmpty()) n = "SE • CESD";
+                        DriveBackup.definirPastaContaNome(AtividadeBackup.this, n);
+                        botaoPastaConta.setText(rotuloPastaConta());
+                        aviso("Pasta da conta Google definida: " + n);
+                    }
+                })
+                .setNeutralButton("Voltar ao padrão", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        DriveBackup.definirPastaContaNome(AtividadeBackup.this, "");
+                        botaoPastaConta.setText(rotuloPastaConta());
+                        aviso("Voltou para a pasta padrão “SE • CESD”.");
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
     private void mostrarPasta() {
         if (pastaEscolhida == null) return;
+        if (botaoEscolherPasta != null) {
+            botaoEscolherPasta.setText(drive.temSaf()
+                    ? "Trocar pasta do backup…"
+                    : "Escolher pasta do backup…");
+        }
         if (drive.temSaf()) {
             pastaEscolhida.setText("Pasta atual: " + drive.nomeSafPasta()
                     + "\nO backup desta pasta usa o app Drive do aparelho — sem autorização extra.");

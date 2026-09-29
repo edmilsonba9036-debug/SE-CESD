@@ -685,6 +685,24 @@ public class DriveBackup {
         return atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE);
     }
 
+    /** Nome da pasta no Drive usada pelo fluxo da conta (padrão: SE • CESD). */
+    public static String pastaContaNome(Activity a) {
+        String n = a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getString("pastaContaNome", "");
+        return n.isEmpty() ? NOME_PASTA : n;
+    }
+
+    /** Define o nome da pasta no Drive para o fluxo da conta. */
+    public static void definirPastaContaNome(Activity a, String nome) {
+        a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .edit().putString("pastaContaNome", nome == null ? "" : nome.trim()).apply();
+    }
+
+    private String nomePastaAtual() {
+        String n = prefs().getString("pastaContaNome", "");
+        return n.isEmpty() ? NOME_PASTA : n;
+    }
+
     /** Há pasta escolhida no seletor (Drive ou outro local)? */
     public boolean temSaf() {
         return !prefs().getString("safPastaUri", "").isEmpty();
@@ -842,7 +860,7 @@ public class DriveBackup {
         String id = localizarPasta(t);
         if (id != null) return id;
         JSONObject meta = new JSONObject();
-        meta.put("name", NOME_PASTA);
+        meta.put("name", nomePastaAtual());
         meta.put("mimeType", "application/vnd.google-apps.folder");
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
         escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
@@ -855,7 +873,7 @@ public class DriveBackup {
     }
 
     private String localizarPasta(String t) throws Exception {
-        String q = "name='" + NOME_PASTA + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        String q = "name='" + nomePastaAtual() + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
         return primeiro(buscar(t, q));
     }
 
