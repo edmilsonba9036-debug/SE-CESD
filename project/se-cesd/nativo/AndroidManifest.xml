@@ -23,6 +23,7 @@
         <activity android:name="br.org.secesd.app.AtividadeCadastro" android:exported="false" />
         <activity android:name="br.org.secesd.app.AtividadeTrajetoria" android:exported="false" />
         <activity android:name="br.org.secesd.app.AtividadeMemorial" android:exported="false" />
+        <activity android:name="br.org.secesd.app.AtividadeMemorialVida" android:exported="false" />
         <activity android:name="br.org.secesd.app.AtividadeGaleria" android:exported="false" />
         <activity android:name="br.org.secesd.app.AtividadeBackup" android:exported="false" />
     </application>

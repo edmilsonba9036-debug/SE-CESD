@@ -37,9 +37,13 @@ public class AtividadePainel extends AtividadeBase {
         coluna.addView(cartao, largura());
 
         menu(coluna, "Meu cadastro", "Fotografia e dados do Soldado Especializado", AtividadeCadastro.class);
+        menu(coluna, "Memorial da minha vida",
+                "Fatos e acontecimentos: antes do concurso, durante o concurso, "
+                        + "após formado e até a baixa",
+                AtividadeMemorialVida.class);
         menu(coluna, "Minha trajetória", "Fases e etapas: do concurso à saída da Força Aérea", AtividadeTrajetoria.class);
-        menu(coluna, "Memorial & Insígnia", "A divisa, a história da causa CESD, valores e postos", AtividadeMemorial.class);
-        menu(coluna, "Galeria", "Até 4 fotos pessoais da sua história na FAB", AtividadeGaleria.class);
+        menu(coluna, "Insígnia & Valores", "A divisa, a história da causa CESD, valores e postos", AtividadeMemorial.class);
+        menu(coluna, "Galeria", "4 locais para as fotografias da sua história na FAB", AtividadeGaleria.class);
         menu(coluna, "Backup no Google Drive", "Enviar, proteger e restaurar seus registros", AtividadeBackup.class);
 
         View bloquear = botao("Bloquear", false);
