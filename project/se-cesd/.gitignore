@@ -1,0 +1,7 @@
+# Caches de SDK/Gradle extraídos do zip (não são código)
+.android/cache/
+.android/analytics.settings
+reconstructed/.gradle/
+reconstructed/build/
+reconstructed/app/build/
+*.keystore.lock
