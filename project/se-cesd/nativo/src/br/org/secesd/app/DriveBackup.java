@@ -781,23 +781,58 @@ public class DriveBackup {
                     c.close();
                 }
             }
-        } catch (Exception ignored) {
+        } catch (SecurityException e) {
+            throw new IOException("O Android negou o acesso à pasta escolhida. Toque em “Trocar pasta do backup…” e escolha a pasta de novo.");
+        } catch (Exception e) {
+            throw new IOException("Não consegui ler a pasta escolhida (" + detalhe(e) + "). Toque em “Trocar pasta do backup…” e escolha de novo.");
         }
 
         Uri alvo = existente;
         if (alvo == null) {
-            alvo = DocumentsContract.createDocument(r, pasta, "application/json", NOME_ARQUIVO);
+            try {
+                alvo = DocumentsContract.createDocument(r, pasta, "application/json", NOME_ARQUIVO);
+            } catch (SecurityException e) {
+                throw new IOException("O Android negou a permissão de gravar nessa pasta. Toque em “Trocar pasta do backup…” e escolha de novo.");
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Essa pasta não aceita criar arquivos pelo seletor. Escolha outra pasta em “Trocar pasta do backup…” (ex.: uma pasta dentro do Meu Drive).");
+            } catch (Exception e) {
+                throw new IOException("O Drive recusou criar o arquivo (" + detalhe(e) + "). Tente “Trocar pasta do backup…”.");
+            }
         }
-        if (alvo == null) throw new IOException("Não foi possível criar o arquivo na pasta escolhida.");
-        OutputStream saida = r.openOutputStream(alvo, "w");
-        if (saida == null) throw new IOException("A pasta escolhida não permite escrita.");
-        saida.write(bytes);
-        saida.flush();
-        saida.close();
+        if (alvo == null) {
+            throw new IOException("Não foi possível criar o arquivo na pasta escolhida. Tente “Trocar pasta do backup…”.");
+        }
+
+        OutputStream saida = null;
+        try {
+            saida = r.openOutputStream(alvo, "w");
+            if (saida == null) {
+                throw new IOException("A pasta escolhida não permite escrita. Toque em “Trocar pasta do backup…” e escolha outra pasta.");
+            }
+            saida.write(bytes);
+            saida.flush();
+        } catch (SecurityException e) {
+            throw new IOException("O Android negou a escrita na pasta. Toque em “Trocar pasta do backup…” e escolha de novo.");
+        } catch (IOException e) {
+            throw new IOException("Falha ao gravar na pasta escolhida (" + detalhe(e) + "). Verifique a internet e tente de novo.");
+        } finally {
+            if (saida != null) {
+                try {
+                    saida.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
         prefs().edit()
                 .putBoolean("pendenteEnviar", false)
                 .putLong("ultimoBackup", System.currentTimeMillis())
                 .apply();
+    }
+
+    /** Mensagem curta de um erro, com o nome da classe quando a mensagem vem vazia. */
+    private static String detalhe(Throwable t) {
+        String m = t.getMessage();
+        return (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
     }
 
     /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google. */
@@ -951,6 +986,10 @@ public class DriveBackup {
 
     private String erroAmigavel(Exception e) {
         String m = String.valueOf(e.getMessage());
+        if (m.contains("negou") || m.contains("Trocar pasta") || m.contains("pasta escolhida")
+                || m.contains("não permite escrita") || m.contains("ler a pasta")) {
+            return m; // mensagens de pasta já vêm prontas
+        }
         if (m.contains("HTTP 403")) return "O Google recusou (403). Confira a Drive API ativa e o escopo drive.file no Console.";
         if (m.contains("HTTP")) return "O Google recusou a operação (" + resumo(m) + ").";
         if (m.contains("precisa-tela")) return "Conclua a autorização no Google para continuar.";

@@ -355,7 +355,13 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                     int bandeiras = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
                             | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                     getContentResolver().takePersistableUriPermission(uri, bandeiras);
-                } catch (Exception ignored) {
+                } catch (Exception tentativa1) {
+                    try {
+                        getContentResolver().takePersistableUriPermission(uri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (Exception ignored) {
+                        // sem persistência: o acesso vale para esta sessão
+                    }
                 }
                 drive.definirSafPasta(uri);
                 mostrarPasta();

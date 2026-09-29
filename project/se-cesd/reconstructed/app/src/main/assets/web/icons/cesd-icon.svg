@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="28" fill="#0a2463"/>
-  <path d="M64 18 74 42l25 2-19 16 6 25-22-13-22 13 6-25-19-16 25-2 10-24Z" fill="#f5c542"/>
-  <path d="M64 30 69 47l18 1-14 11 5 18-14-9-14 9 5-18-14-11 18-1 5-17Z" fill="#fff" opacity=".95"/>
-  <text x="64" y="110" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="14" fill="#fff">SE</text>
-</svg>
