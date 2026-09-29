@@ -111,6 +111,26 @@ public class DriveBackup {
                 .getLong("ultimoBackup", 0);
     }
 
+    /** Cria a pasta do backup no Drive imediatamente (sem enviar nada). */
+    public void criarPastaAgora() {
+        fila.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String t = obterToken();
+                    garantirPasta(t);
+                    avisar("Pasta \u201c" + nomePastaAtual() + "\u201d pronta no seu Drive ✓", true);
+                } catch (PrecisaTela e) {
+                    avisar("Conclua a autoriza\u00e7\u00e3o no Google para continuar.", true);
+                } catch (IOException e) {
+                    avisar(erroAmigavel(e), false);
+                } catch (Exception e) {
+                    avisar("N\u00e3o foi poss\u00edvel criar a pasta (" + detalhe(e) + ").", false);
+                }
+            }
+        });
+    }
+
     public void restaurar() {
         iniciar(Acao.RESTAURAR, null, false);
     }
@@ -182,8 +202,13 @@ public class DriveBackup {
         Acao acao = pendente;
         pendente = Acao.NENHUMA;
         if (acao == Acao.CONECTAR) {
-            obterToken();
-            avisar("Conectado ao Google Drive ✓", true);
+            String t = obterToken();
+            try {
+                garantirPasta(t);
+                avisar("Conectado ✓ Pasta \u201c" + nomePastaAtual() + "\u201d pronta no seu Drive", true);
+            } catch (Exception pastaEx) {
+                avisar("Conectado ✓ (a pasta ser\u00e1 criada no primeiro envio)", true);
+            }
         } else if (acao == Acao.ENVIAR) {
             String payload = payloadPendente;
             payloadPendente = null;

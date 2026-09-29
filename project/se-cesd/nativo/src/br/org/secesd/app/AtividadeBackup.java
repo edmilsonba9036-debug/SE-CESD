@@ -58,6 +58,19 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         });
         coluna.addView(conectar, largura());
 
+        View criarPasta = botao("Criar pasta no Drive agora", false);
+        criarPasta.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (drive.temSaf()) {
+                    aviso("Você já escolheu uma pasta pelo seletor — o backup vai direto para ela. "
+                            + "Esta pasta criada serve para o modo conta Google.");
+                }
+                drive.criarPastaAgora();
+            }
+        });
+        coluna.addView(criarPasta, largura());
+
         View navegador = botao("Acesso pelo navegador (alternativo)", false);
         navegador.setOnClickListener(new View.OnClickListener() {
             @Override
