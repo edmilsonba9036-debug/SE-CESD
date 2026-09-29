@@ -6,8 +6,10 @@ import android.accounts.AccountManagerCallback;
 import android.accounts.AccountManagerFuture;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -15,6 +17,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URLDecoder;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -228,8 +233,265 @@ public class DriveBackup {
                 + "(pacote br.org.secesd.debug + SHA-1) e tente novamente. (Detalhe: " + detalhe + ")";
     }
 
+    // ------------------------------------------------------------------
+    // Plano B: login pelo NAVEGADOR (cliente OAuth tipo Desktop + PKCE +
+    // redirect loopback 127.0.0.1 — permitido pelo Google para desktop).
+    // Independente de pacote/SHA-1 e do Play Services do aparelho.
+    // ------------------------------------------------------------------
+
+    static final String TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+    static final String AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/auth";
+
+    private long tokenExpiraEm = 0;
+
+    private boolean browserConfigurado() {
+        SharedPreferences p = atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE);
+        return !p.getString("browserClientId", "").isEmpty();
+    }
+
+    /** ID/segredo do cliente Desktop configurados pelo usuário no app. */
+    public String idBrowser() {
+        return atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getString("browserClientId", "");
+    }
+
+    public void configurarBrowser(String clientId, String clientSecret) {
+        atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .edit()
+                .putString("browserClientId", clientId == null ? "" : clientId.trim())
+                .putString("browserClientSecret", clientSecret == null ? "" : clientSecret.trim())
+                .apply();
+        token = null;
+        tokenExpiraEm = 0;
+    }
+
+    public void removerConfigBrowser() {
+        SharedPreferences p = atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE);
+        p.edit().remove("browserClientId").remove("browserClientSecret")
+                .remove("browserRefreshToken").apply();
+        token = null;
+        tokenExpiraEm = 0;
+    }
+
+
+    /** Segredo salvo, apenas para preencher o campo de edição. */
+    public String segredoParaEdicao() {
+        return atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getString("browserClientSecret", "");
+    }
+
+    private String segredoBrowser() {
+        return atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getString("browserClientSecret", "");
+    }
+
+    private static String base64url(byte[] bytes) {
+        return android.util.Base64.encodeToString(bytes,
+                android.util.Base64.URL_SAFE | android.util.Base64.NO_WRAP | android.util.Base64.NO_PADDING);
+    }
+
+    /** Fluxo completo: PKCE → navegador → loopback → troca do código → tokens. */
+    private void loginPeloNavegador() throws IOException {
+        final String clientId = idBrowser();
+        if (clientId.isEmpty()) {
+            throw new IOException("Configure o ID do cliente (navegador) na tela de backup antes de conectar.");
+        }
+        avisar("Abrindo o Google no navegador…", true);
+
+        byte[] aleatorio = new byte[48];
+        new java.security.SecureRandom().nextBytes(aleatorio);
+        final String verificador = base64url(aleatorio);
+        byte[] resumo;
+        try {
+            resumo = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(verificador.getBytes("US-ASCII"));
+        } catch (Exception e) {
+            throw new IOException("Falha ao gerar o desafio PKCE.");
+        }
+        final String desafio = base64url(resumo);
+        final String estado = base64url(aleatorio, 0, 12);
+
+        ServerSocket servidor;
+        try {
+            servidor = new ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"));
+        } catch (IOException e) {
+            throw new IOException("Não foi possível abrir a porta local para o retorno do Google.");
+        }
+        final String redirect = "http://127.0.0.1:" + servidor.getLocalPort() + "/callback";
+
+        final String url = AUTH_ENDPOINT
+                + "?client_id=" + URLEncoder.encode(clientId, "UTF-8")
+                + "&redirect_uri=" + URLEncoder.encode(redirect, "UTF-8")
+                + "&response_type=code"
+                + "&scope=" + URLEncoder.encode(ESCOPO, "UTF-8")
+                + "&code_challenge=" + URLEncoder.encode(desafio, "UTF-8")
+                + "&code_challenge_method=S256"
+                + "&state=" + URLEncoder.encode(estado, "UTF-8")
+                + "&access_type=offline&prompt=consent";
+        atividade.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Intent navegador = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                    navegador.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    atividade.startActivity(navegador);
+                } catch (Exception e) {
+                    avisar("Nenhum navegador disponível neste aparelho.", false);
+                }
+            }
+        });
+
+        String codigo = null;
+        try {
+            servidor.setSoTimeout(300000); // 5 min para o usuário concluir
+            Socket cliente = servidor.accept();
+            java.io.BufferedReader entrada = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(cliente.getInputStream(), "US-ASCII"));
+            String linha = entrada.readLine(); // "GET /callback?... HTTP/1.1"
+            java.io.OutputStream bruto = cliente.getOutputStream();
+            if (linha != null && linha.contains("/callback")) {
+                String alvo = linha.split(" ")[1];
+                String consulta = alvo.contains("?") ? alvo.substring(alvo.indexOf('?') + 1) : "";
+                String erro = parametro(consulta, "error");
+                String voltaEstado = parametro(consulta, "state");
+                if (erro != null) {
+                    respostaHtml(bruto, "Autorização não concluída (" + erro + "). Volte ao app.");
+                    entrada.close(); bruto.close(); cliente.close();
+                    throw new IOException("O Google retornou: " + erro);
+                }
+                if (voltaEstado == null || !estado.equals(voltaEstado)) {
+                    respostaHtml(bruto, "Resposta inválida. Volte ao app e tente de novo.");
+                    entrada.close(); bruto.close(); cliente.close();
+                    throw new IOException("Resposta do Google com estado inválido.");
+                }
+                codigo = parametro(consulta, "code");
+                respostaHtml(bruto, "<b>Autorizado!</b><br>Pode fechar esta aba e voltar ao aplicativo SE • CESD.");
+            }
+            entrada.close();
+            bruto.close();
+            cliente.close();
+        } catch (java.net.SocketTimeoutException e) {
+            throw new IOException("O navegador não voltou ao app (5 min esgotados). Tente de novo.");
+        } catch (IOException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IOException("Falha ao receber o retorno do Google no aparelho.");
+        } finally {
+            try {
+                servidor.close();
+            } catch (IOException ignored) {
+            }
+        }
+
+        if (codigo == null || codigo.isEmpty()) {
+            throw new IOException("O Google não devolveu o código de autorização.");
+        }
+
+        // Troca do código pelos tokens (PKCE + segredo do cliente instalado).
+        String corpo = "code=" + URLEncoder.encode(codigo, "UTF-8")
+                + "&client_id=" + URLEncoder.encode(clientId, "UTF-8")
+                + "&client_secret=" + URLEncoder.encode(segredoBrowser(), "UTF-8")
+                + "&redirect_uri=" + URLEncoder.encode(redirect, "UTF-8")
+                + "&grant_type=authorization_code"
+                + "&code_verifier=" + URLEncoder.encode(verificador, "UTF-8");
+        JSONObject resposta = postarFormulario(TOKEN_ENDPOINT, corpo);
+        salvarTokens(resposta);
+        avisar("Conectado pelo navegador ✓", true);
+    }
+
+    private static String base64url(byte[] bytes, int de, int ate) {
+        byte[] pedaco = new byte[ate - de];
+        System.arraycopy(bytes, de, pedaco, pedaco.length == bytes.length ? 0 : 0, pedaco.length);
+        return base64url(pedaco);
+    }
+
+    private String parametro(String consulta, String nome) {
+        for (String par : consulta.split("&")) {
+            int igual = par.indexOf('=');
+            if (igual < 0) continue;
+            if (par.substring(0, igual).equals(nome)) {
+                try {
+                    return URLDecoder.decode(par.substring(igual + 1), "UTF-8");
+                } catch (Exception e) {
+                    return par.substring(igual + 1);
+                }
+            }
+        }
+        return null;
+    }
+
+    private void respostaHtml(java.io.OutputStream bruto, String html) throws IOException {
+        byte[] pagina = ("<html><head><meta charset='utf-8'><title>SE • CESD</title></head>"
+                + "<body style='font-family:sans-serif;padding:28px;text-align:center'>" + html
+                + "</body></html>").getBytes(StandardCharsets.UTF_8);
+        String cabecalho = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n"
+                + "Content-Length: " + pagina.length + "\r\nConnection: close\r\n\r\n";
+        bruto.write(cabecalho.getBytes(StandardCharsets.UTF_8));
+        bruto.write(pagina);
+        bruto.flush();
+    }
+
+    private JSONObject postarFormulario(String endpoint, String formulario) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(20000);
+        conn.setReadTimeout(30000);
+        conn.setDoOutput(true);
+        conn.setFixedLengthStreamingMode(formulario.getBytes(StandardCharsets.UTF_8).length);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        java.io.OutputStream saida = conn.getOutputStream();
+        saida.write(formulario.getBytes(StandardCharsets.UTF_8));
+        saida.flush();
+        saida.close();
+        int codigo = conn.getResponseCode();
+        String corpo = ler(conn, codigo);
+        conn.disconnect();
+        if (codigo < 200 || codigo >= 300) {
+            throw new IOException("O Google recusou a troca de tokens (HTTP " + codigo + ": " + resumo(corpo) + ").");
+        }
+        try {
+            return new JSONObject(corpo);
+        } catch (JSONException e) {
+            throw new IOException("Resposta inválida do Google na troca de tokens.");
+        }
+    }
+
+    private void salvarTokens(JSONObject resposta) throws IOException {
+        String acesso = resposta.optString("access_token", "");
+        if (acesso.isEmpty()) throw new IOException("O Google não devolveu o token de acesso.");
+        token = acesso;
+        long segundos = resposta.optLong("expires_in", 3600);
+        tokenExpiraEm = System.currentTimeMillis() + (segundos - 120) * 1000L;
+        String renovacao = resposta.optString("refresh_token", "");
+        if (!renovacao.isEmpty()) {
+            atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                    .edit().putString("browserRefreshToken", renovacao).apply();
+        }
+    }
+
+    private String obterTokenNavegador() throws IOException {
+        if (token != null && System.currentTimeMillis() < tokenExpiraEm) return token;
+        String renovacao = atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
+                .getString("browserRefreshToken", "");
+        if (renovacao.isEmpty()) {
+            loginPeloNavegador();
+            return token;
+        }
+        String corpo = "client_id=" + URLEncoder.encode(idBrowser(), "UTF-8")
+                + "&client_secret=" + URLEncoder.encode(segredoBrowser(), "UTF-8")
+                + "&grant_type=refresh_token"
+                + "&refresh_token=" + URLEncoder.encode(renovacao, "UTF-8");
+        salvarTokens(postarFormulario(TOKEN_ENDPOINT, corpo));
+        return token;
+    }
+
     private String obterToken() throws IOException {
-        if (token != null) return token;
+        if (token != null && (!browserConfigurado() || System.currentTimeMillis() < tokenExpiraEm)) {
+            return token;
+        }
+        if (browserConfigurado()) {
+            return obterTokenNavegador();
+        }
         Account conta = conta();
         if (conta == null) {
             escolherConta();

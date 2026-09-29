@@ -49,6 +49,13 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         });
         coluna.addView(conectar, largura());
 
+        View navegador = botao("Acesso pelo navegador (alternativo)", false);
+        navegador.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { dialogoNavegador(); }
+        });
+        coluna.addView(navegador, largura());
+
         status = new TextView(this);
         status.setTextColor(CINZA_TEXTO);
         status.setTextSize(14);
@@ -107,6 +114,55 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         } catch (Exception e) {
             aviso("Não foi possível ler o cofre para enviar.");
         }
+    }
+
+
+    /**
+     * Plano B: configura o cliente OAuth do tipo DESKTOP criado no Google
+     * Cloud (não precisa SHA-1 nem pacote) e entra pelo navegador com PKCE.
+     */
+    private void dialogoNavegador() {
+        LinearLayout formulario = new LinearLayout(this);
+        formulario.setOrientation(LinearLayout.VERTICAL);
+        int p = px(18);
+        formulario.setPadding(p, p, p, 0);
+        final android.widget.EditText id = campo("ID do cliente (…apps.googleusercontent.com)");
+        id.setSingleLine(false);
+        id.setMinLines(2);
+        final android.widget.EditText segredo = campo("Segredo do cliente (GOCSPX-…)");
+        id.setText(drive.idBrowser());
+        segredo.setText(drive.segredoParaEdicao());
+        formulario.addView(id);
+        formulario.addView(segredo, largura());
+        TextView dica = texto("No Cloud Console: Credenciais → Criar credenciais → ID do cliente OAuth "
+                + "→ tipo “Aplicativo desktop” → Criar. Copie o ID e o segredo e cole aqui.");
+        dica.setTextSize(12);
+        formulario.addView(dica);
+        new AlertDialog.Builder(this)
+                .setTitle("Acesso pelo navegador")
+                .setView(formulario)
+                .setPositiveButton("Salvar e conectar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        String i = id.getText().toString().trim();
+                        String s = segredo.getText().toString().trim();
+                        if (i.isEmpty() || s.isEmpty()) {
+                            aviso("Preencha o ID e o segredo do cliente desktop.");
+                            return;
+                        }
+                        drive.configurarBrowser(i, s);
+                        drive.conectar();
+                    }
+                })
+                .setNeutralButton("Limpar configuração", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        drive.removerConfigBrowser();
+                        aviso("Configuração do navegador removida.");
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
     }
 
     @Override
