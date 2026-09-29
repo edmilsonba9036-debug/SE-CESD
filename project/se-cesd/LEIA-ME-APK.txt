@@ -128,6 +128,27 @@ TESTE RECOMENDADO EM APARELHO FÍSICO
   5. Revogar o acesso em myaccount.google.com/permissions e tentar de novo
      (o app deve pedir autorização novamente).
 
+APK NATIVO (NOVO — SE-CESD-nativo-v1.1.apk)
+Aplicativo Android NATIVO (sem WebView), mesmo pacote registrado no Google
+Cloud (br.org.secesd.debug) e MESMA assinatura (SHA-1 25:32:BE:...:21:7D):
+- Estrutura em 7 telas: Criar acesso/Entrar → Painel → Meu cadastro (com
+  fotografia), Minha trajetória (etapas por data), Memorial & Insígnia,
+  Galeria (até 4 fotos) e Backup no Google Drive.
+- Criptografia nativa: PBKDF2WithHmacSHA256 (120.000 iterações) + AES-256-GCM
+  (javax.crypto do próprio Android); cofre só existe cifrado no disco.
+- Backup no Drive: AccountManager/AccountPicker (consentimento do Play
+  Services) + Drive REST v3, pasta “SE • CESD”, arquivo único
+  SE-CESD-backup.json (create → PATCH), restauração com confirmação.
+- Zero dependências externas (build com framework android.jar API 33;
+  minSdk 26 / targetSdk 33; versionCode 2, versionName 1.1).
+- Código-fonte completo em nativo/ (src + res + AndroidManifest.xml).
+- Verificado: apksigner “Verifies” (v2+v3), aapt2 dump badging confirma
+  pacote, ícone e activity de lançamento.
+- Pode coexistir com o app WebView (pacote br.org.secesd); ambos podem usar
+  o mesmo backup no Drive (mesmo formato de cofre).
+- Observação: “GET_ACCOUNTS” é solicitado pelo seletor de contas em versões
+  antigas; nenhuma outra permissão é pedida.
+
 INSTALAÇÃO
 1. Transfira SE-CESD.apk para o Android.
 2. Abra o APK e permita temporariamente a instalação por essa fonte, se solicitado.
