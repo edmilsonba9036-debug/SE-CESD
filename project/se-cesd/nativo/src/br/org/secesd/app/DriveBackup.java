@@ -198,6 +198,36 @@ public class DriveBackup {
         PrecisaTela() { super("precisa-tela"); }
     }
 
+    /**
+     * Traduz a falha do autenticador do Google em orientação prática.
+     * As causas dominantes são: (1) o app não está registrado no Google Cloud
+     * com o pacote+SHA-1 corretos; (2) a conta não é testadora na tela de
+     * consentimento (escopo drive.file é restrito); (3) sem internet.
+     */
+    private String orientarFalhaAutenticador(android.accounts.AuthenticatorException e) {
+        String detalhe = String.valueOf(e.getMessage());
+        if (e.getCause() != null && e.getCause().getMessage() != null) {
+            detalhe += " | " + e.getCause().getMessage();
+        }
+        String t = detalhe.toLowerCase();
+        boolean naoReconhece =
+                t.contains("invalid") || t.contains("unregistered") || t.contains("unsuccessful")
+                        || t.contains("client") || t.contains("notfound") || t.equals("null");
+        if (naoReconhece) {
+            return "O Google não reconheceu este app para o Drive. No Google Cloud Console → APIs e "
+                    + "Serviços → Credenciais, confirme que existe um cliente OAuth do tipo ANDROID com "
+                    + "Nome do pacote = br.org.secesd.debug e SHA-1 = 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:"
+                    + "A7:5D:37:00:57:21:7D. Em Tela de consentimento → Usuários de teste, adicione a sua "
+                    + "conta Google. Aguarde 5 minutos, reinicie o Wi-Fi/dados e toque em Conectar de novo. "
+                    + "(Detalhe técnico: " + detalhe + ")";
+        }
+        if (t.contains("network")) {
+            return "Sem conexão com o Google. Verifique a internet e tente novamente.";
+        }
+        return "Falha no serviço de contas Google. Confira o cliente Android no Cloud Console "
+                + "(pacote br.org.secesd.debug + SHA-1) e tente novamente. (Detalhe: " + detalhe + ")";
+    }
+
     private String obterToken() throws IOException {
         if (token != null) return token;
         Account conta = conta();
@@ -214,7 +244,14 @@ public class DriveBackup {
         } catch (android.accounts.OperationCanceledException e) {
             throw new IOException("Você cancelou a autorização do Google.");
         } catch (android.accounts.AuthenticatorException e) {
-            throw new IOException("O serviço de contas Google não respondeu. Verifique o Play Services.");
+            throw new IOException(orientarFalhaAutenticador(e));
+        } catch (IOException e) {
+            String d = String.valueOf(e.getMessage());
+            if (d.contains("NetworkError") || d.toLowerCase().contains("network")
+                    || d.toLowerCase().contains("timeout")) {
+                throw new IOException("Sem conexão com o Google. Verifique a internet e tente novamente.");
+            }
+            throw new IOException("Falha ao falar com o Google: " + d);
         }
         Intent tela = (Intent) resultado.getParcelable(AccountManager.KEY_INTENT);
         if (tela != null) {
