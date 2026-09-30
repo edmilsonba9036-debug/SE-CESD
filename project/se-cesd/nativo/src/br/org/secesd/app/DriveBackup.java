@@ -653,8 +653,8 @@ public class DriveBackup {
                     escrever(conn, corpo);
                 } else {
                     conn = abrir(API_UPLOAD + "files/" + arquivoId + "?uploadType=media&fields=id", t, "PATCH");
-                    escrever(conn, bytes);
                     conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    escrever(conn, bytes);
                 }
                 int codigo = conn.getResponseCode();
                 String corpo = ler(conn, codigo);
@@ -873,6 +873,7 @@ public class DriveBackup {
         }
         prefs().edit()
                 .putBoolean("pendenteEnviar", false)
+                .putInt("safRecusas", 0)
                 .putLong("ultimoBackup", System.currentTimeMillis())
                 .apply();
     }
@@ -883,29 +884,37 @@ public class DriveBackup {
         return (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
     }
 
+    private void registrarRecusaSeletor() {
+        int n = prefs().getInt("safRecusas", 0) + 1;
+        prefs().edit().putInt("safRecusas", n).apply();
+    }
+
     /** A pasta escolhida no seletor recusou a gravação (o Drive às vezes entrega
         a pasta de um jeito que o Android não consegue gravar dentro). */
     private static boolean seletorRecusou(IOException e) {
         String m = String.valueOf(e.getMessage());
         return m.contains("não aceita criar arquivos") || m.contains("não permite escrita")
                 || m.contains("negou") || m.contains("recusou criar o arquivo")
-                || m.contains("Não foi possível criar o arquivo");
+                || m.contains("Não foi possível criar o arquivo") || m.contains("ler a pasta");
     }
 
-    /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google. */
-    public void enviarSmart(String cofreJson, boolean quieto) {
-        if (temSaf()) {
+    /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google.
+     *  Depois de 2 recusas seguidas do seletor, envia direto pela conta. */
+    public void enviarSmart(String cofreJson, final boolean quieto) {
+        if (temSaf() && prefs().getInt("safRecusas", 0) < 2) {
             fila.execute(new Runnable() {
                 @Override
                 public void run() {
                     try {
                         if (!quieto) avisar("Salvando na pasta escolhida…", true);
                         enviarSaf(cofreJson);
+                        prefs().edit().putInt("safRecusas", 0).apply();
                         avisar(quieto ? "Backup automático salvo na pasta ✓"
                                       : "Backup salvo na pasta escolhida ✓", true);
                     } catch (IOException e) {
                         if (seletorRecusou(e) && prontoParaEnviar()) {
-                            avisar("A pasta do seletor não aceitou o arquivo — salvando pela sua conta Google…", true);
+                            registrarRecusaSeletor();
+                            if (!quieto) avisar("O seletor recusou a pasta — salvando pela sua conta Google…", true);
                             iniciar(Acao.ENVIAR, cofreJson, quieto);
                         } else {
                             avisar(erroAmigavel(e), false);
@@ -915,6 +924,12 @@ public class DriveBackup {
                     }
                 }
             });
+        } else if (temSaf()) {
+            if (!quieto) {
+                avisar("O seletor continua recusando essa pasta — enviando pela sua conta Google (pasta \u201c"
+                        + nomePastaAtual() + "\u201d).", true);
+            }
+            iniciar(Acao.ENVIAR, cofreJson, quieto);
         } else if (quieto) {
             if (prontoParaEnviar()) iniciar(Acao.ENVIAR, cofreJson, true);
         } else {
