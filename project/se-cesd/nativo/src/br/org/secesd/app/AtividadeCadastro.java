@@ -40,7 +40,7 @@ public class AtividadeCadastro extends AtividadeBase {
         int moldH = (int) (moldW * 4f / 3f);
 
         foto = new ImageView(this);
-        foto.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        foto.setScaleType(ImageView.ScaleType.CENTER_CROP); // preenche a moldura: sem faixas
         foto.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) { escolherFoto(); }
@@ -66,27 +66,6 @@ public class AtividadeCadastro extends AtividadeBase {
         moldura.gravity = android.view.Gravity.CENTER_HORIZONTAL;
         moldura.topMargin = px(6);
         coluna.addView(quadro, moldura);
-
-        View girarFotoC = botao("\u27f2 Girar foto (anti-horário)", false);
-        girarFotoC.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (fotoBase64 == null || fotoBase64.isEmpty()) { aviso("Insira a foto primeiro."); return; }
-                try {
-                    byte[] bytes = android.util.Base64.decode(fotoBase64, android.util.Base64.NO_WRAP);
-                    Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    if (b == null) { aviso("Não consegui girar essa foto."); return; }
-                    b = girar(b, 270);
-                    fotoBase64 = android.util.Base64.encodeToString(jpeg(b, 1280), android.util.Base64.NO_WRAP);
-                    foto.setImageBitmap(b);
-                    salvar();
-                    aviso("Foto girada ✓");
-                } catch (Exception e) {
-                    aviso("Não consegui girar essa foto.");
-                }
-            }
-        });
-        coluna.addView(girarFotoC, largura());
 
         TextView dicaFoto = texto("Toque na moldura para escolher a fotografia (JPG). "
                 + "É salva neste aparelho, criptografada com a sua senha.");

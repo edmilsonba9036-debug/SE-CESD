@@ -78,15 +78,12 @@ export default function TelaCadastro({ avisar }: PropsTela) {
     <div className="mt-3">
       <Cartao>
         <Moldura marcador={'📷\nToque para\ninserir a foto'} aoTocar={() => arquivoRef.current?.click()}>
-          {foto && <img src={'data:image/jpeg;base64,' + foto} alt="Fotografia" className="h-full w-full rounded-lg object-contain" />}
+          {foto && <img src={'data:image/jpeg;base64,' + foto} alt="Fotografia" className="h-full w-full rounded-lg object-cover" />}
         </Moldura>
         <input ref={arquivoRef} type="file" accept="image/*" className="hidden" onChange={aoEscolherFoto} />
         <p className="mt-3 text-center text-[12px] text-tinta">
           Toque na moldura para escolher a fotografia (JPG). É salva criptografada com a sua senha.
         </p>
-        <div className="mt-3 flex flex-col gap-3">
-          <Botao onClick={girar}>⟲ Girar foto (anti-horário)</Botao>
-        </div>
       </Cartao>
 
       <Cartao className="mt-4">
