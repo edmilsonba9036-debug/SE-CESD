@@ -19,15 +19,10 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private TextView status;
     private DriveBackup drive;
     private android.widget.Button botaoAuto;
-    private TextView pastaEscolhida;
-    private View limparPasta;
-    private android.widget.Button botaoEscolherPasta;
-    private android.widget.Button botaoPastaConta;
     private android.widget.Button copiarErro;
     private android.widget.Button abrirCadastro;
     private TextView usuarioLinha;
     private String ultimoErro;
-    private static final int PEDIR_PASTA = 4404;
     private static final int PEDIR_ARQUIVO = 4405;
 
     @Override
@@ -36,6 +31,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         if (!Cofre.sessaoAberta()) { ir(AtividadeAcesso.class); finish(); return; }
 
         drive = new DriveBackup(this, this);
+        drive.limparModosAntigos(); // seletor e navegador saem de cena de vez
 
         ScrollView rolagem = tela("Backup no Google Drive",
                 "O cofre vai criptografado (AES-GCM com a sua senha) para a pasta “SE • CESD” do seu Drive. "
@@ -62,69 +58,6 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
             public void onClick(View v) { drive.conectar(); }
         });
         coluna.addView(conectar, largura());
-
-        View criarPasta = botao("Criar pasta no Drive agora", false);
-        criarPasta.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (drive.temSaf()) {
-                    aviso("Você já escolheu uma pasta pelo seletor — o backup vai direto para ela. "
-                            + "Esta pasta criada serve para o modo conta Google.");
-                }
-                drive.criarPastaAgora();
-            }
-        });
-        coluna.addView(criarPasta, largura());
-
-        View navegador = botao("Acesso pelo navegador (alternativo)", false);
-        navegador.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) { dialogoNavegador(); }
-        });
-        coluna.addView(navegador, largura());
-
-        coluna.addView(titulo("Pasta no Drive (mais simples)"));
-        botaoEscolherPasta = botao("Escolher pasta do backup…", false);
-        botaoEscolherPasta.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-                try {
-                    startActivityForResult(i, PEDIR_PASTA);
-                } catch (Exception e) {
-                    aviso("Este aparelho não tem o seletor de pastas.");
-                }
-            }
-        });
-        coluna.addView(botaoEscolherPasta, largura());
-
-        pastaEscolhida = new TextView(this);
-        pastaEscolhida.setTextSize(13);
-        pastaEscolhida.setPadding(0, px(6), 0, 0);
-        coluna.addView(pastaEscolhida);
-
-        limparPasta = botao("Limpar pasta escolhida", false);
-        limparPasta.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                drive.definirSafPasta(null);
-                mostrarPasta();
-                aviso("Pasta escolhida removida.");
-            }
-        });
-        coluna.addView(limparPasta, largura());
-
-        botaoPastaConta = botao(rotuloPastaConta(), false);
-        botaoPastaConta.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) { dialogoPastaConta(); }
-        });
-        coluna.addView(botaoPastaConta, largura());
-        TextView dicaPasta = texto("“Trocar pasta” vale para a pasta escolhida no seletor. "
-                + "O nome abaixo vale para o backup pela conta Google (cria ou usa a pasta com esse nome no Drive).");
-        dicaPasta.setTextSize(11.5f);
-        coluna.addView(dicaPasta);
-        mostrarPasta();
 
         coluna.addView(titulo("Restaurar de um arquivo"));
         View escolherArquivo = botao("Escolher arquivo de backup…", false);
@@ -351,7 +284,6 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     @Override
     public void status(String mensagem, boolean ok) {
         ultimoErro = ok ? null : mensagem;
-        if (pastaEscolhida != null) mostrarPasta(); // a pasta pode ter sido removida pelo app
         if (copiarErro != null) {
             copiarErro.setVisibility(ok ? android.view.View.GONE : android.view.View.VISIBLE);
         }
@@ -405,65 +337,6 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     }
 
 
-    private String rotuloPastaConta() {
-        return "Pasta da conta Google: " + DriveBackup.pastaContaNome(this);
-    }
-
-    private void dialogoPastaConta() {
-        LinearLayout formulario = new LinearLayout(this);
-        formulario.setOrientation(LinearLayout.VERTICAL);
-        int p = px(18);
-        formulario.setPadding(p, p, p, 0);
-        final android.widget.EditText nome = campo("Nome da pasta no Drive");
-        nome.setText(DriveBackup.pastaContaNome(this));
-        formulario.addView(nome);
-        formulario.addView(texto("Se a pasta já existir no seu Drive com esse nome, o backup usa ela; "
-                + "se não existir, o app cria."));
-        new AlertDialog.Builder(this)
-                .setTitle("Pasta do backup (conta Google)")
-                .setView(formulario)
-                .setPositiveButton("Salvar", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        String n = nome.getText().toString().trim();
-                        if (n.isEmpty()) n = "SE • CESD";
-                        DriveBackup.definirPastaContaNome(AtividadeBackup.this, n);
-                        botaoPastaConta.setText(rotuloPastaConta());
-                        aviso("Pasta da conta Google definida: " + n);
-                    }
-                })
-                .setNeutralButton("Voltar ao padrão", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        DriveBackup.definirPastaContaNome(AtividadeBackup.this, "");
-                        botaoPastaConta.setText(rotuloPastaConta());
-                        aviso("Voltou para a pasta padrão “SE • CESD”.");
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private void mostrarPasta() {
-        if (pastaEscolhida == null) return;
-        if (botaoEscolherPasta != null) {
-            botaoEscolherPasta.setText(drive.temSaf()
-                    ? "Trocar pasta do backup…"
-                    : "Escolher pasta do backup…");
-        }
-        if (drive.temSaf()) {
-            pastaEscolhida.setText("Pasta atual: " + drive.nomeSafPasta()
-                    + "\nO backup desta pasta usa o app Drive do aparelho — sem autorização extra.");
-            pastaEscolhida.setTextColor(0xFF1B5E20);
-            limparPasta.setVisibility(View.VISIBLE);
-        } else {
-            pastaEscolhida.setText("Nenhuma pasta escolhida — o backup usará a conta Google "
-                    + "(pasta “SE • CESD” no Drive).");
-            pastaEscolhida.setTextColor(CINZA_TEXTO);
-            limparPasta.setVisibility(View.GONE);
-        }
-    }
-
     private void restaurarDeUri(final android.net.Uri uri) {
         new Thread(new Runnable() {
             @Override
@@ -494,78 +367,9 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 : "Backup automático: DESLIGADO";
     }
 
-    /**
-     * Plano B: configura o cliente OAuth do tipo DESKTOP criado no Google
-     * Cloud (não precisa SHA-1 nem pacote) e entra pelo navegador com PKCE.
-     */
-    private void dialogoNavegador() {
-        LinearLayout formulario = new LinearLayout(this);
-        formulario.setOrientation(LinearLayout.VERTICAL);
-        int p = px(18);
-        formulario.setPadding(p, p, p, 0);
-        final android.widget.EditText id = campo("ID do cliente (…apps.googleusercontent.com)");
-        id.setSingleLine(false);
-        id.setMinLines(2);
-        final android.widget.EditText segredo = campo("Segredo do cliente (GOCSPX-…)");
-        id.setText(drive.idBrowser());
-        segredo.setText(drive.segredoParaEdicao());
-        formulario.addView(id);
-        formulario.addView(segredo, largura());
-        TextView dica = texto("No Cloud Console: Credenciais → Criar credenciais → ID do cliente OAuth "
-                + "→ tipo “Aplicativo desktop” → Criar. Copie o ID e o segredo e cole aqui.");
-        dica.setTextSize(12);
-        formulario.addView(dica);
-        new AlertDialog.Builder(this)
-                .setTitle("Acesso pelo navegador")
-                .setView(formulario)
-                .setPositiveButton("Salvar e conectar", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        String i = id.getText().toString().trim();
-                        String s = segredo.getText().toString().trim();
-                        if (i.isEmpty() || s.isEmpty()) {
-                            aviso("Preencha o ID e o segredo do cliente desktop.");
-                            return;
-                        }
-                        drive.configurarBrowser(i, s);
-                        drive.conectar();
-                    }
-                })
-                .setNeutralButton("Limpar configuração", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        drive.removerConfigBrowser();
-                        aviso("Configuração do navegador removida. Agora o app usa a sua CONTA Google — toque em Enviar backup.");
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == PEDIR_PASTA) {
-            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
-                android.net.Uri uri = data.getData();
-                try {
-                    int bandeiras = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                    getContentResolver().takePersistableUriPermission(uri, bandeiras);
-                } catch (Exception tentativa1) {
-                    try {
-                        getContentResolver().takePersistableUriPermission(uri,
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    } catch (Exception ignored) {
-                        // sem persistência: o acesso vale para esta sessão
-                    }
-                }
-                drive.definirSafPasta(uri);
-                mostrarPasta();
-                aviso("Pasta definida: " + drive.nomeSafPasta());
-            }
-            return;
-        }
         if (requestCode == PEDIR_ARQUIVO) {
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
                 restaurarDeUri(data.getData());

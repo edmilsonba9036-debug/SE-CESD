@@ -145,6 +145,13 @@ public class DriveBackup {
         iniciar(Acao.CONECTAR, null, true);
     }
 
+    /** Limpa modos antigos (seletor de pasta e navegador): a conta Google é o caminho. */
+    public void limparModosAntigos() {
+        if (browserConfigurado()) removerConfigBrowser();
+        if (temSaf()) definirSafPasta(null);
+        prefs().edit().remove("safRecusas").apply();
+    }
+
     public void restaurar() {
         iniciar(Acao.RESTAURAR, null, false);
     }
