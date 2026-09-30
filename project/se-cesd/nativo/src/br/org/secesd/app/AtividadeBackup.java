@@ -171,6 +171,9 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
 
         setContentView(rolagem);
+
+        // Cria/verifica a pasta do Drive automaticamente, sem tocar em nada.
+        drive.criarPastaAutomatica();
     }
 
     @Override

@@ -131,6 +131,20 @@ public class DriveBackup {
         });
     }
 
+    /**
+     * Chamada ao abrir a tela de backup: conecta e garante a pasta no Drive
+     * sem que a pessoa precise tocar em nada. Depois da autoriza\u00e7\u00e3o \u00fanica
+     * do Google, cada abertura do app deixa a pasta pronta sozinha.
+     */
+    public void criarPastaAutomatica() {
+        if (System.currentTimeMillis() < prefs().getLong("autoPausaAte", 0L)) return;
+        boolean navegadorPendente = browserConfigurado()
+                && prefs().getString("browserRefreshToken", "").isEmpty()
+                && conta() == null;
+        if (navegadorPendente) return;
+        iniciar(Acao.CONECTAR, null, true);
+    }
+
     public void restaurar() {
         iniciar(Acao.RESTAURAR, null, false);
     }
@@ -140,6 +154,8 @@ public class DriveBackup {
         if (requestCode == RC_CONTA) {
             String nome = data != null ? data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME) : null;
             if (nome == null) {
+                prefs().edit().putLong("autoPausaAte",
+                        System.currentTimeMillis() + 3L * 24 * 60 * 60 * 1000).apply();
                 avisar("Nenhuma conta escolhida.", false);
             } else {
                 salvarConta(nome);
@@ -204,8 +220,13 @@ public class DriveBackup {
         if (acao == Acao.CONECTAR) {
             String t = obterToken();
             try {
+                boolean jaExistia = localizarPasta(t) != null;
                 garantirPasta(t);
-                avisar("Conectado ✓ Pasta \u201c" + nomePastaAtual() + "\u201d pronta no seu Drive", true);
+                if (!silencioso) {
+                    avisar("Conectado ✓ Pasta \u201c" + nomePastaAtual() + "\u201d pronta no seu Drive", true);
+                } else if (!jaExistia) {
+                    avisar("Pasta \u201c" + nomePastaAtual() + "\u201d criada no seu Drive ✓", true);
+                }
             } catch (Exception pastaEx) {
                 avisar("Conectado ✓ (a pasta ser\u00e1 criada no primeiro envio)", true);
             }
@@ -564,6 +585,8 @@ public class DriveBackup {
                     conta, "oauth2:" + ESCOPO, new Bundle(), null, null, null);
             resultado = futuro.getResult();
         } catch (android.accounts.OperationCanceledException e) {
+            prefs().edit().putLong("autoPausaAte",
+                    System.currentTimeMillis() + 3L * 24 * 60 * 60 * 1000).apply();
             throw new IOException("Você cancelou a autorização do Google.");
         } catch (android.accounts.AuthenticatorException e) {
             throw new IOException(orientarFalhaAutenticador(e));
