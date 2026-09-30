@@ -22,6 +22,8 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private View limparPasta;
     private android.widget.Button botaoEscolherPasta;
     private android.widget.Button botaoPastaConta;
+    private android.widget.Button copiarErro;
+    private String ultimoErro;
     private static final int PEDIR_PASTA = 4404;
     private static final int PEDIR_ARQUIVO = 4405;
 
@@ -166,6 +168,24 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         status.setPadding(0, px(14), 0, 0);
         coluna.addView(status);
 
+        copiarErro = botao("📋 Copiar o erro (cole aqui na conversa)", false);
+        copiarErro.setVisibility(android.view.View.GONE);
+        copiarErro.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (ultimoErro == null) return;
+                try {
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("erro", ultimoErro));
+                    aviso("Erro copiado! Volte à conversa, segure o campo de mensagem e toque em Colar.");
+                } catch (Exception e) {
+                    aviso("Não consegui copiar. Anote as primeiras palavras do erro.");
+                }
+            }
+        });
+        coluna.addView(copiarErro, largura());
+
         coluna.addView(texto("\nArquivo único SE-CESD-backup.json: cada envio atualiza o mesmo arquivo, "
                 + "mantendo só a versão mais recente. Com o automático LIGADO, qualquer alteração "
                 + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
@@ -178,6 +198,10 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
 
     @Override
     public void status(String mensagem, boolean ok) {
+        ultimoErro = ok ? null : mensagem;
+        if (copiarErro != null) {
+            copiarErro.setVisibility(ok ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
         if (status != null) {
             status.setText(mensagem);
             status.setTextColor(ok ? 0xFF1B5E20 : 0xFFB00020);

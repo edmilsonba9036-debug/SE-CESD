@@ -690,11 +690,21 @@ public class DriveBackup {
                     return;
                 }
                 if (codigo == 401 && tentativa == 0) { token = null; continue; }
+                if ((codigo >= 500 || codigo == 403) && tentativa == 0) {
+                    try { Thread.sleep(1500); } catch (InterruptedException ie) { }
+                    continue; // instabilidade/recusa momentânea do Google: tenta mais uma vez
+                }
                 throw new IOException("HTTP " + codigo + ": " + resumo(corpo));
             } catch (PrecisaTela e) {
                 throw e;
             } catch (IOException e) {
-                if (tentativa == 0 && String.valueOf(e.getMessage()).contains("401")) { token = null; continue; }
+                String m = String.valueOf(e.getMessage());
+                if (tentativa == 0 && m.contains("401")) { token = null; continue; }
+                if (tentativa == 0 && (m.contains("Sem conexão") || m.toLowerCase().contains("timeout")
+                        || m.toLowerCase().contains("failed") || m.toLowerCase().contains("connect"))) {
+                    try { Thread.sleep(1500); } catch (InterruptedException ie) { }
+                    continue; // rede oscilou: tenta mais uma vez
+                }
                 throw e;
             }
         }
