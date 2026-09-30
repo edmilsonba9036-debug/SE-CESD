@@ -1051,8 +1051,8 @@ public class DriveBackup {
         meta.put("name", nomePastaAtual());
         meta.put("mimeType", "application/vnd.google-apps.folder");
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
-        escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
         int codigo = conn.getResponseCode();
         String corpo = ler(conn, codigo);
         conn.disconnect();
