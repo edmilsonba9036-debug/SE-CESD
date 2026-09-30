@@ -233,7 +233,7 @@ public class DriveBackup {
         } else if (acao == Acao.ENVIAR) {
             String payload = payloadPendente;
             payloadPendente = null;
-            enviar(payload);
+            executarEnvio(payload);
         } else if (acao == Acao.RESTAURAR) {
             baixar();
         }
@@ -842,7 +842,7 @@ public class DriveBackup {
             } catch (SecurityException e) {
                 throw new IOException("O Android negou a permissão de gravar nessa pasta. Toque em “Trocar pasta do backup…” e escolha de novo.");
             } catch (IllegalArgumentException e) {
-                throw new IOException("Essa pasta não aceita criar arquivos pelo seletor. Escolha outra pasta em “Trocar pasta do backup…” (ex.: uma pasta dentro do Meu Drive).");
+                throw new IOException("Essa pasta não aceita criar arquivos pelo seletor (o Drive às vezes entrega a pasta de um jeito que o Android não consegue gravar). Em “Trocar pasta do backup…”, escolha a pasta navegando: Drive → Meu Drive → sua pasta. Ou use a conta Google, que o app envia sozinho.");
             } catch (Exception e) {
                 throw new IOException("O Drive recusou criar o arquivo (" + detalhe(e) + "). Tente “Trocar pasta do backup…”.");
             }
@@ -883,6 +883,15 @@ public class DriveBackup {
         return (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
     }
 
+    /** A pasta escolhida no seletor recusou a gravação (o Drive às vezes entrega
+        a pasta de um jeito que o Android não consegue gravar dentro). */
+    private static boolean seletorRecusou(IOException e) {
+        String m = String.valueOf(e.getMessage());
+        return m.contains("não aceita criar arquivos") || m.contains("não permite escrita")
+                || m.contains("negou") || m.contains("recusou criar o arquivo")
+                || m.contains("Não foi possível criar o arquivo");
+    }
+
     /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google. */
     public void enviarSmart(String cofreJson, boolean quieto) {
         if (temSaf()) {
@@ -895,7 +904,12 @@ public class DriveBackup {
                         avisar(quieto ? "Backup automático salvo na pasta ✓"
                                       : "Backup salvo na pasta escolhida ✓", true);
                     } catch (IOException e) {
-                        avisar(erroAmigavel(e), false);
+                        if (seletorRecusou(e) && prontoParaEnviar()) {
+                            avisar("A pasta do seletor não aceitou o arquivo — salvando pela sua conta Google…", true);
+                            iniciar(Acao.ENVIAR, cofreJson, quieto);
+                        } else {
+                            avisar(erroAmigavel(e), false);
+                        }
                     } catch (Exception e) {
                         avisar("Falha ao salvar na pasta escolhida.", false);
                     }
