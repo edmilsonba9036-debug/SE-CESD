@@ -27,6 +27,12 @@ public class AtividadeTrajetoria extends AtividadeBase {
         carregar();
     }
 
+    private EditText fTitulo, fData, fLocal, fDescricao;
+    private TextView rotuloForm;
+    private View btnCancelarEdicao;
+    private ScrollView rolagemRef;
+    private int editIndice = -1;
+
     private void carregar() {
         try {
             etapas = Cofre.lerDados(this).optJSONArray("trajetoria");
@@ -42,6 +48,41 @@ public class AtividadeTrajetoria extends AtividadeBase {
                 "Registre toda a sua caminhada, desde antes do concurso até a saída da Força Aérea. "
                         + "As etapas aparecem em ordem de data.");
         LinearLayout coluna = coluna(rolagem);
+        rolagemRef = rolagem;
+
+        // FÓRMULÁRIO SEMPRE À VISTA (sem janelinhas): nova/editar etapa
+        LinearLayout form = cartao();
+        rotuloForm = new TextView(this);
+        rotuloForm.setText(editIndice >= 0
+                ? "EDITANDO ETAPA — altere os campos e toque em Salvar"
+                : "REGISTRAR ETAPA — os campos estão aqui à vista");
+        rotuloForm.setTextColor(AZUL_MARINHA);
+        rotuloForm.setTextSize(13);
+        rotuloForm.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        form.addView(rotuloForm);
+        fTitulo = campo("Título (ex.: Aprovação no concurso do CESD)");
+        fData = campo("Data (AAAA-MM-DD)");
+        fData.setInputType(android.text.InputType.TYPE_CLASS_DATETIME);
+        fLocal = campo("Local ou OM (opcional)");
+        fDescricao = campoMultilinha("Conte essa etapa com suas palavras.", 3);
+        form.addView(fTitulo, largura());
+        form.addView(fData, largura());
+        form.addView(fLocal, largura());
+        form.addView(fDescricao, largura());
+        View salvarEtapaBtn = botao(editIndice >= 0 ? "Salvar alterações" : "Salvar etapa", true);
+        salvarEtapaBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { salvarDaTela(); }
+        });
+        form.addView(salvarEtapaBtn, largura());
+        btnCancelarEdicao = botao("Cancelar edição", false);
+        btnCancelarEdicao.setVisibility(editIndice >= 0 ? View.VISIBLE : View.GONE);
+        btnCancelarEdicao.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { preencherFormulario(-1); }
+        });
+        form.addView(btnCancelarEdicao, largura());
+        coluna.addView(form, largura());
 
         // ordena por data (string yyyy-mm-dd)
         try {
@@ -81,7 +122,7 @@ public class AtividadeTrajetoria extends AtividadeBase {
                 View editar = botao("Editar", false);
                 editar.setOnClickListener(new View.OnClickListener() {
                     @Override
-                    public void onClick(View v) { dialogo(indice); }
+                    public void onClick(View v) { preencherFormulario(indice); }
                 });
                 View remover = botao("Remover", false);
                 remover.setOnClickListener(new View.OnClickListener() {
@@ -103,10 +144,38 @@ public class AtividadeTrajetoria extends AtividadeBase {
         View adicionar = botao("Adicionar etapa", true);
         adicionar.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) { dialogo(-1); }
+            public void onClick(View v) { preencherFormulario(-1); }
         });
         coluna.addView(adicionar, largura());
         setContentView(rolagem);
+    }
+
+    /** Carrega a etapa no formulário da tela (ou limpa, para uma nova). */
+    private void preencherFormulario(int indice) {
+        editIndice = indice;
+        montar();
+        if (indice >= 0) {
+            JSONObject e = etapas.optJSONObject(indice);
+            if (e != null) {
+                fTitulo.setText(e.optString("titulo"));
+                fData.setText(e.optString("data"));
+                fLocal.setText(e.optString("local"));
+                fDescricao.setText(e.optString("descricao"));
+            }
+        }
+        if (rolagemRef != null) rolagemRef.smoothScrollTo(0, 0);
+    }
+
+    /** Salva lendo os campos SEMPRE VISÍVEIS no topo da tela. */
+    private void salvarDaTela() {
+        if (fTitulo.getText().toString().trim().length() < 3) {
+            aviso("Dê um título à etapa (mínimo de 3 letras).");
+            return;
+        }
+        salvar(editIndice, fTitulo, fData, fLocal, fDescricao);
+        editIndice = -1;
+        montar();
+        if (rolagemRef != null) rolagemRef.smoothScrollTo(0, 0);
     }
 
     private void dialogo(final int indice) {

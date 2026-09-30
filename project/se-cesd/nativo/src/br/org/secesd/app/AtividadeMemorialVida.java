@@ -73,6 +73,16 @@ public class AtividadeMemorialVida extends AtividadeBase {
         out.putInt("trilha", trilhaAtual);
     }
 
+    private EditText fTitulo, fData, fLocal, fDescricao;
+    private TextView rotuloForm, faseTexto;
+    private View btnCancelarEdicao;
+    private ScrollView rolagemRef;
+    private final java.util.List<TextView> chips = new java.util.ArrayList<>();
+    private int trilhaSelecionada = 0;
+    private int editIndice = -1;
+    private int editTrilha = -1;
+    private static final String[] CHIP = {"I", "II", "III", "IV", "EX"};
+
     private void carregar() {
         try {
             JSONObject m = Cofre.lerDados(this).optJSONObject("memorial");
@@ -116,6 +126,77 @@ public class AtividadeMemorialVida extends AtividadeBase {
         ScrollView rolagem = tela("Memorial da minha vida",
                 "Registre suas histórias militares nas 5 trilhas e veja tudo junto na linha do tempo.");
         LinearLayout coluna = coluna(rolagem);
+        rolagemRef = rolagem;
+
+        // FÓRMULÁRIO SEMPRE À VISTA (sem janelinhas): registrar/editar fato
+        LinearLayout formF = cartao();
+        rotuloForm = new TextView(this);
+        rotuloForm.setText(editIndice >= 0
+                ? "EDITANDO FATO — altere os campos e toque em Salvar"
+                : "REGISTRAR FATO — os campos estão aqui à vista");
+        rotuloForm.setTextColor(AZUL_MARINHA);
+        rotuloForm.setTextSize(13);
+        rotuloForm.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        formF.addView(rotuloForm);
+
+        faseTexto = new TextView(this);
+        faseTexto.setText("Fase: " + TRILHAS[trilhaSelecionada]);
+        faseTexto.setTextColor(CINZA_TEXTO);
+        faseTexto.setTextSize(12);
+        faseTexto.setPadding(0, px(6), 0, px(4));
+        formF.addView(faseTexto);
+
+        chips.clear();
+        LinearLayout linhaChips = new LinearLayout(this);
+        linhaChips.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < CHIP.length; i++) {
+            final int fase = i;
+            TextView chip = new TextView(this);
+            chip.setText(CHIP[i]);
+            chip.setTextSize(13);
+            chip.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setPadding(0, px(8), 0, px(8));
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) { selecionarTrilha(fase); }
+            });
+            LinearLayout.LayoutParams pc = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            pc.rightMargin = px(6);
+            linhaChips.addView(chip, pc);
+            chips.add(chip);
+        }
+        repintaChips();
+        formF.addView(linhaChips, largura());
+
+        fTitulo = campo("Fato/acontecimento (ex.: Aprovação no concurso do CESD)");
+        fData = campo("Data (AAAA-MM-DD)");
+        fData.setInputType(android.text.InputType.TYPE_CLASS_DATETIME);
+        fLocal = campo("Unidade/Cidade (ex.: 3ª Cia — Exército; CESD — FAB)");
+        fDescricao = campoMultilinha("Conte essa história com suas palavras.", 4);
+        formF.addView(fTitulo, largura());
+        formF.addView(fData, largura());
+        formF.addView(fLocal, largura());
+        formF.addView(fDescricao, largura());
+
+        View salvarFatoBtn = botao(editIndice >= 0 ? "Salvar alterações" : "Salvar fato", true);
+        salvarFatoBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { salvarDaTela(); }
+        });
+        formF.addView(salvarFatoBtn, largura());
+
+        btnCancelarEdicao = botao("Cancelar edição", false);
+        btnCancelarEdicao.setVisibility(editIndice >= 0 ? View.VISIBLE : View.GONE);
+        btnCancelarEdicao.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { preencherFormulario(0, -1); }
+        });
+        formF.addView(btnCancelarEdicao, largura());
+
+        coluna.addView(formF, largura());
+
 
         int total = totalFatos();
         LinearLayout resumo = cartao();
@@ -255,7 +336,7 @@ public class AtividadeMemorialVida extends AtividadeBase {
             View editar = botao("Editar", false);
             editar.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View v) { dialogoFato(trilha, indice); }
+                public void onClick(View v) { preencherFormulario(trilha, indice); }
             });
             View remover = botao("Remover", false);
             remover.setOnClickListener(new View.OnClickListener() {
@@ -276,7 +357,7 @@ public class AtividadeMemorialVida extends AtividadeBase {
         View adicionar = botao("+ Adicionar fato nesta trilha", true);
         adicionar.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) { dialogoFato(trilha, -1); }
+            public void onClick(View v) { selecionarTrilha(trilha); }
         });
         coluna.addView(adicionar, largura());
         setContentView(rolagem);
@@ -397,6 +478,59 @@ public class AtividadeMemorialVida extends AtividadeBase {
             memorial.put(CHAVES[trilha], fatos);
         } catch (Exception ignored) {
         }
+    }
+
+    /** Escolhe a fase (chips) sem perder o que já foi digitado. */
+    private void selecionarTrilha(int fase) {
+        trilhaSelecionada = fase;
+        if (editIndice < 0 && faseTexto != null) {
+            faseTexto.setText("Fase: " + TRILHAS[fase]);
+        }
+        repintaChips();
+    }
+
+    private void repintaChips() {
+        for (int i = 0; i < chips.size(); i++) {
+            TextView chip = chips.get(i);
+            boolean sel = i == trilhaSelecionada;
+            chip.setBackground(arredondado(sel ? TRILHAS_COR[i] : 0xFFE8EEF6, px(14),
+                    sel ? TRILHAS_COR[i] : 0xFFC7D4E6, px(1)));
+            chip.setTextColor(sel ? 0xFFFFFFFF : AZUL_MARINHA);
+        }
+        if (faseTexto != null && editIndice < 0) {
+            faseTexto.setText("Fase: " + TRILHAS[trilhaSelecionada]);
+        }
+    }
+
+    /** Carrega o fato no formulário da tela (ou limpa, para um novo). */
+    private void preencherFormulario(int trilha, int indice) {
+        editTrilha = indice >= 0 ? trilha : -1;
+        editIndice = indice;
+        trilhaSelecionada = trilha;
+        montar();
+        if (indice >= 0) {
+            JSONObject original = fatosDaTrilha(trilha).optJSONObject(indice);
+            if (original != null) {
+                fTitulo.setText(original.optString("titulo"));
+                fData.setText(original.optString("data"));
+                fLocal.setText(original.optString("local"));
+                fDescricao.setText(original.optString("descricao"));
+            }
+        }
+        if (rolagemRef != null) rolagemRef.smoothScrollTo(0, 0);
+    }
+
+    /** Salva lendo os campos SEMPRE VISÍVEIS no topo da tela. */
+    private void salvarDaTela() {
+        if (fTitulo.getText().toString().trim().length() < 3) {
+            aviso("Dê um título ao fato (mínimo de 3 letras).");
+            return;
+        }
+        int trilhaAlvo = editTrilha >= 0 ? editTrilha : trilhaSelecionada;
+        int indiceAlvo = editIndice;
+        editIndice = -1;
+        editTrilha = -1;
+        salvarFato(trilhaAlvo, indiceAlvo, fTitulo, fData, fLocal, fDescricao);
     }
 
     private void dialogoFato(final int trilha, final int indice) {
