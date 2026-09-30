@@ -74,6 +74,7 @@ public final class Cofre {
             vazio.put("cadastro", new JSONObject());
             vazio.put("trajetoria", new JSONArray());
             vazio.put("galeria", new JSONArray());
+            vazio.put("documentos", new JSONArray());
             byte[] dados = cifrar(chave, ivDados, vazio.toString());
 
             JSONObject cofre = new JSONObject();

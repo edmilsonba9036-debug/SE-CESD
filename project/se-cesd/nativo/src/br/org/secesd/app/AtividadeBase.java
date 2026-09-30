@@ -181,6 +181,49 @@ public abstract class AtividadeBase extends Activity {
         return new Space(this);
     }
 
+    /** Corrige a rotação da câmera (EXIF) — fotos verticais deixam de aparecer deitadas. */
+    protected static android.graphics.Bitmap comExif(java.io.InputStream entrada, android.graphics.Bitmap b) {
+        if (b == null) return null;
+        try {
+            android.media.ExifInterface ex = new android.media.ExifInterface(entrada);
+            int o = ex.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1);
+            float g = 0;
+            if (o == android.media.ExifInterface.ORIENTATION_ROTATE_90) g = 90;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_180) g = 180;
+            else if (o == android.media.ExifInterface.ORIENTATION_ROTATE_270) g = 270;
+            if (g != 0) b = girar(b, g);
+        } catch (Exception ignored) {
+        }
+        return b;
+    }
+
+    /** Gira o bitmap (270 = 90° anti-horário). */
+    protected static android.graphics.Bitmap girar(android.graphics.Bitmap b, float graus) {
+        if (b == null) return null;
+        android.graphics.Matrix m = new android.graphics.Matrix();
+        m.postRotate(graus);
+        return android.graphics.Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+    }
+
+    /** Reduz ao lado máximo e comprime em JPEG (bytes prontos para o cofre). */
+    protected static byte[] jpeg(android.graphics.Bitmap b, int maxLado) {
+        if (b == null) return new byte[0];
+        if (maxLado > 0 && (b.getWidth() > maxLado || b.getHeight() > maxLado)) {
+            int novoW, novoH;
+            if (b.getWidth() > b.getHeight()) {
+                novoW = maxLado;
+                novoH = b.getHeight() * maxLado / b.getWidth();
+            } else {
+                novoH = maxLado;
+                novoW = b.getWidth() * maxLado / b.getHeight();
+            }
+            b = android.graphics.Bitmap.createScaledBitmap(b, novoW, novoH, true);
+        }
+        java.io.ByteArrayOutputStream saida = new java.io.ByteArrayOutputStream();
+        b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, saida);
+        return saida.toByteArray();
+    }
+
     protected LinearLayout.LayoutParams largura() {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);

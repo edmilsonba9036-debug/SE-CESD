@@ -34,22 +34,64 @@ public class AtividadeCadastro extends AtividadeBase {
         ScrollView rolagem = tela("Meu cadastro", "Adicione sua fotografia e preencha seus dados de Soldado Especializado.");
         LinearLayout coluna = coluna(rolagem);
 
+        // Moldura VERTICAL (retrato 3:4) e CENTRALIZADA — padrão 3x4 militar.
+        int larguraTelaC = getResources().getDisplayMetrics().widthPixels;
+        int moldW = Math.min((int) (larguraTelaC * 0.62f), px(300));
+        int moldH = (int) (moldW * 4f / 3f);
+
         foto = new ImageView(this);
-        foto.setAdjustViewBounds(true);
-        foto.setMaxHeight(px(220));
-        foto.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        foto.setBackground(arredondado(0xFFDCE9F8, px(14), 0xFF9DB8D9, px(1)));
-        foto.setPadding(px(4), px(4), px(4), px(4));
+        foto.setScaleType(ImageView.ScaleType.FIT_CENTER);
         foto.setOnClickListener(new View.OnClickListener() {
             @Override
+            public void onClick(View v) { escolherFoto(); }
+        });
+
+        android.widget.FrameLayout quadro = new android.widget.FrameLayout(this);
+        quadro.setBackground(arredondado(0xFFDCE9F8, px(10), 0xFF9DB8D9, px(1)));
+        quadro.setPadding(px(4), px(4), px(4), px(4));
+        TextView marcador = new TextView(this);
+        marcador.setText("📷\nToque para\ninserir a foto");
+        marcador.setTextColor(0xFF6B84A3);
+        marcador.setTextSize(13);
+        marcador.setGravity(android.view.Gravity.CENTER);
+        marcador.setClickable(false);
+        quadro.addView(marcador, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        quadro.addView(foto, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout.LayoutParams moldura = new LinearLayout.LayoutParams(moldW, moldH);
+        moldura.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        moldura.topMargin = px(6);
+        coluna.addView(quadro, moldura);
+
+        View girarFotoC = botao("\u27f2 Girar foto (anti-horário)", false);
+        girarFotoC.setOnClickListener(new View.OnClickListener() {
+            @Override
             public void onClick(View v) {
-                escolherFoto();
+                if (fotoBase64 == null || fotoBase64.isEmpty()) { aviso("Insira a foto primeiro."); return; }
+                try {
+                    byte[] bytes = android.util.Base64.decode(fotoBase64, android.util.Base64.NO_WRAP);
+                    Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (b == null) { aviso("Não consegui girar essa foto."); return; }
+                    b = girar(b, 270);
+                    fotoBase64 = android.util.Base64.encodeToString(jpeg(b, 1280), android.util.Base64.NO_WRAP);
+                    foto.setImageBitmap(b);
+                    salvar();
+                    aviso("Foto girada ✓");
+                } catch (Exception e) {
+                    aviso("Não consegui girar essa foto.");
+                }
             }
         });
-        coluna.addView(foto, largura());
+        coluna.addView(girarFotoC, largura());
+
         TextView dicaFoto = texto("Toque na moldura para escolher a fotografia (JPG). "
                 + "É salva neste aparelho, criptografada com a sua senha.");
         dicaFoto.setTextSize(12);
+        dicaFoto.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
         coluna.addView(dicaFoto);
 
         nomeCompleto = campo("Nome completo");
@@ -144,7 +186,7 @@ public class AtividadeCadastro extends AtividadeBase {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != PEDIR_FOTO || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         try {
-            Bitmap original = decodificar(data.getData(), 1280);
+            Bitmap original = comExif(getContentResolver().openInputStream(data.getData()), decodificar(data.getData(), 1280));
             if (original == null) {
                 aviso("Não foi possível abrir a foto. O arquivo pode estar danificado.");
                 return;

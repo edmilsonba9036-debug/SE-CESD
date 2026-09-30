@@ -143,7 +143,12 @@ public class AtividadeGaleria extends AtividadeBase {
             if (foto != null) {
                 LinearLayout botoes = new LinearLayout(this);
                 botoes.setOrientation(LinearLayout.HORIZONTAL);
-                View trocar = botao("Trocar foto", false);
+                View girar = botao("\u27f2 Girar", false);
+                girar.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) { girarFoto(qual); }
+                });
+                View trocar = botao("Trocar", false);
                 trocar.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) { escolher(qual); }
@@ -153,10 +158,17 @@ public class AtividadeGaleria extends AtividadeBase {
                     @Override
                     public void onClick(View v) { remover(qual); }
                 });
-                LinearLayout.LayoutParams metade = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams tercoA = new LinearLayout.LayoutParams(
                         0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-                botoes.addView(trocar, metade);
-                botoes.addView(remover, metade);
+                LinearLayout.LayoutParams tercoB = new LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                LinearLayout.LayoutParams tercoC = new LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                tercoB.leftMargin = px(4);
+                tercoC.leftMargin = px(4);
+                botoes.addView(girar, tercoA);
+                botoes.addView(trocar, tercoB);
+                botoes.addView(remover, tercoC);
                 cartao.addView(botoes);
             }
             coluna.addView(cartao, largura());
@@ -194,6 +206,23 @@ public class AtividadeGaleria extends AtividadeBase {
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
+    }
+
+    /** Gira a foto 90° anti-horário e GRAVA girada (vale no app e no backup). */
+    private void girarFoto(int slot) {
+        JSONObject f = fotoDoSlot(slot);
+        if (f == null) return;
+        try {
+            byte[] bytes = android.util.Base64.decode(f.optString("foto"), android.util.Base64.NO_WRAP);
+            Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            if (b == null) { aviso("Não consegui girar essa foto."); return; }
+            b = girar(b, 270);
+            f.put("foto", android.util.Base64.encodeToString(jpeg(b, 1280), android.util.Base64.NO_WRAP));
+            persistir();
+            montar();
+        } catch (Exception e) {
+            aviso("Não consegui girar essa foto.");
+        }
     }
 
     private void ampliar(int slot) {
@@ -257,6 +286,7 @@ public class AtividadeGaleria extends AtividadeBase {
             BitmapFactory.Options opcoes = new BitmapFactory.Options();
             opcoes.inSampleSize = amostra;
             Bitmap b = BitmapFactory.decodeStream(getContentResolver().openInputStream(data.getData()), null, opcoes);
+            b = comExif(getContentResolver().openInputStream(data.getData()), b);
             if (b == null) {
                 aviso("Não foi possível abrir a foto.");
                 return;

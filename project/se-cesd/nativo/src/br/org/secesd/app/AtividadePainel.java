@@ -56,6 +56,8 @@ public class AtividadePainel extends AtividadeBase {
                 "Fotografia e dados do Soldado Especializado", AtividadeCadastro.class);
         menu(coluna, "GA", OURO, "Galeria",
                 "4 locais para as fotografias da sua história", AtividadeGaleria.class);
+        menu(coluna, "DC", COR_FASE2, "Documentos",
+                "Seus documentos (PDF e imagens), criptografados no cofre", AtividadeDocumentos.class);
 
         coluna.addView(titulo("Institucional"));
         menu(coluna, "IV", COR_FASE4, "Insígnia & Valores",
