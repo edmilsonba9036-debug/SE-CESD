@@ -379,7 +379,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                     @Override
                     public void onClick(DialogInterface d, int qual) {
                         drive.removerConfigBrowser();
-                        aviso("Configuração do navegador removida.");
+                        aviso("Configuração do navegador removida. Agora o app usa a sua CONTA Google — toque em Enviar backup.");
                     }
                 })
                 .setNegativeButton("Cancelar", null)

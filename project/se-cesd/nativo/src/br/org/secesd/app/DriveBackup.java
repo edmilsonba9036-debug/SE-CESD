@@ -378,7 +378,7 @@ public class DriveBackup {
         if (clientId.isEmpty()) {
             throw new IOException("Configure o ID do cliente (navegador) na tela de backup antes de conectar.");
         }
-        avisar("Abrindo o Google no navegador…", true);
+        avisar("Abrindo o Google no navegador… CONCLUA A AUTORIZAÇÃO LÁ e volte ao app (se nada abrir, este caminho está com problema — use a conta Google).", true);
 
         byte[] aleatorio = new byte[48];
         new java.security.SecureRandom().nextBytes(aleatorio);
@@ -587,17 +587,34 @@ public class DriveBackup {
     }
 
     private String obterToken() throws IOException {
-        if (token != null && (!browserConfigurado() || System.currentTimeMillis() < tokenExpiraEm)) {
+        if (token != null && System.currentTimeMillis() < tokenExpiraEm) {
             return token;
+        }
+        // Prioridade: CONTA GOOGLE (sem navegador, sem troca de tokens) quando
+        // já está configurada. O navegador fica apenas como plano B.
+        if (conta() != null) {
+            try {
+                return obterTokenConta();
+            } catch (IOException e) {
+                String m = String.valueOf(e.getMessage());
+                boolean falhaDoServico = m.contains("ainda não conhece")
+                        || m.contains("Falha no serviço de contas");
+                if (falhaDoServico && browserConfigurado()) {
+                    return obterTokenNavegador();
+                }
+                throw e;
+            }
         }
         if (browserConfigurado()) {
             return obterTokenNavegador();
         }
+        escolherConta();
+        throw new PrecisaTela();
+    }
+
+    /** Token pela conta Google do aparelho (Play Services — sem navegador). */
+    private String obterTokenConta() throws IOException {
         Account conta = conta();
-        if (conta == null) {
-            escolherConta();
-            throw new PrecisaTela();
-        }
         AccountManager am = AccountManager.get(atividade);
         Bundle resultado;
         try {
