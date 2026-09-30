@@ -126,6 +126,30 @@ public final class Cofre {
     }
 
     /**
+     * Muda o nome de usuário do cofre (os dados ficam intactos).
+     * Devolve erro ou null.
+     */
+    public static String mudarUsuario(Context ctx, String novoUsuario) {
+        try {
+            if (novoUsuario == null || novoUsuario.trim().length() < 3) return "O usuário deve ter pelo menos 3 caracteres.";
+            novoUsuario = novoUsuario.trim();
+            if (novoUsuario.contains(" ")) return "Não use espaços no usuário.";
+            JSONObject c = lerBruto(ctx);
+            String atual = c.optString("usuario", "");
+            if (novoUsuario.equals(atual)) return "Esse já é o seu nome de usuário.";
+            c.put("usuario", novoUsuario);
+            c.put("resumoUsuario", resumo(novoUsuario + "/" + novoUsuario));
+            gravar(ctx, c.toString());
+            usuarioSessao = novoUsuario;
+            ctx.getSharedPreferences("drive-backup", Context.MODE_PRIVATE)
+                    .edit().putBoolean("pendenteEnviar", true).apply();
+            return null;
+        } catch (Exception e) {
+            return "Não foi possível mudar o usuário: " + mensagem(e);
+        }
+    }
+
+    /**
      * Troca a senha do cofre: prova a senha atual, re-criptografa os dados
      * com um sal e chave novos e mantém a sessão aberta. Devolve erro ou null.
      */

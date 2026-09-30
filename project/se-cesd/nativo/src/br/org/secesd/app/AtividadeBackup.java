@@ -25,6 +25,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private android.widget.Button botaoPastaConta;
     private android.widget.Button copiarErro;
     private android.widget.Button abrirCadastro;
+    private TextView usuarioLinha;
     private String ultimoErro;
     private static final int PEDIR_PASTA = 4404;
     private static final int PEDIR_ARQUIVO = 4405;
@@ -208,6 +209,16 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
 
         coluna.addView(titulo("Segurança"));
+        usuarioLinha = texto("Usuário: " + Cofre.usuarioGravado(this));
+        usuarioLinha.setTextSize(14);
+        usuarioLinha.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        coluna.addView(usuarioLinha);
+        View mudarUsuario = botao("Mudar nome de usuário…", false);
+        mudarUsuario.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { dialogoMudarUsuario(); }
+        });
+        coluna.addView(mudarUsuario, largura());
         View trocarSenha = botao("Trocar senha do cofre…", false);
         trocarSenha.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -221,6 +232,50 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
 
         // Cria/verifica a pasta do Drive automaticamente, sem tocar em nada.
         drive.criarPastaAutomatica();
+    }
+
+    private void dialogoMudarUsuario() {
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int p = px(20);
+        caixa.setPadding(p, p / 2, p, 0);
+        final android.widget.EditText campo = new android.widget.EditText(this);
+        campo.setHint("Novo nome de usuário");
+        campo.setText(Cofre.usuarioGravado(this));
+        caixa.addView(campo);
+
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle("Mudar nome de usuário")
+                .setMessage("Pelo menos 3 caracteres, sem espaços. Seus dados e sua senha ficam intactos; o backup no Drive é atualizado.")
+                .setView(caixa)
+                .setPositiveButton("Salvar", null)
+                .setNegativeButton("Cancelar", null)
+                .create();
+        d.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(final DialogInterface di) {
+                ((AlertDialog) di).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final String novo = campo.getText().toString();
+                        final String erro = Cofre.mudarUsuario(AtividadeBackup.this, novo);
+                        if (erro != null) {
+                            aviso(erro);
+                            return;
+                        }
+                        ((AlertDialog) di).dismiss();
+                        if (usuarioLinha != null) usuarioLinha.setText("Usuário: " + Cofre.usuarioGravado(AtividadeBackup.this));
+                        aviso("Nome de usuário alterado ✓ Atualizando o backup no Drive…");
+                        try {
+                            drive.enviarSmart(Cofre.exportar(AtividadeBackup.this), false);
+                        } catch (Exception e) {
+                            aviso("Usuário alterado ✓ — toque em Enviar backup para atualizar o Drive.");
+                        }
+                    }
+                });
+            }
+        });
+        d.show();
     }
 
     private void dialogoTrocarSenha() {
