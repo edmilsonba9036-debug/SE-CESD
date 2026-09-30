@@ -613,7 +613,8 @@ public class DriveBackup {
         } catch (IOException e) {
             String d = String.valueOf(e.getMessage());
             if (d.contains("NetworkError") || d.toLowerCase().contains("network")
-                    || d.toLowerCase().contains("timeout")) {
+                    || d.toLowerCase().contains("timeout")
+                    || d.contains("Unable to resolve host") || d.contains("No address associated")) {
                 throw new IOException("Sem conexão com o Google. Verifique a internet e tente novamente.");
             }
             throw new IOException("Falha ao falar com o Google: " + d);
@@ -701,7 +702,8 @@ public class DriveBackup {
                 String m = String.valueOf(e.getMessage());
                 if (tentativa == 0 && m.contains("401")) { token = null; continue; }
                 if (tentativa == 0 && (m.contains("Sem conexão") || m.toLowerCase().contains("timeout")
-                        || m.toLowerCase().contains("failed") || m.toLowerCase().contains("connect"))) {
+                        || m.toLowerCase().contains("failed") || m.toLowerCase().contains("connect")
+                        || m.contains("Unable to resolve host") || m.contains("No address associated"))) {
                     try { Thread.sleep(1500); } catch (InterruptedException ie) { }
                     continue; // rede oscilou: tenta mais uma vez
                 }
@@ -1107,6 +1109,10 @@ public class DriveBackup {
 
     private String erroAmigavel(Exception e) {
         String m = String.valueOf(e.getMessage());
+        if (m.contains("Unable to resolve host") || m.contains("No address associated")
+                || m.contains("resolve host") || m.contains("EAI_AGAIN")) {
+            return "Sem internet agora: o celular não encontrou o Google. Confira o Wi-Fi ou os dados móveis (e se o modo avião está desligado) e toque em Enviar de novo.";
+        }
         if (m.contains("negou") || m.contains("Trocar pasta") || m.contains("pasta escolhida")
                 || m.contains("não permite escrita") || m.contains("ler a pasta")) {
             return m; // mensagens de pasta já vêm prontas
