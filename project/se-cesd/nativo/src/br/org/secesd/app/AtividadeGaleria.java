@@ -67,6 +67,7 @@ public class AtividadeGaleria extends AtividadeBase {
             rotulo.setTextColor(OURO);
             rotulo.setTextSize(11);
             rotulo.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            rotulo.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
             cartao.addView(rotulo);
 
             TextView legenda = new TextView(this);
@@ -82,15 +83,16 @@ public class AtividadeGaleria extends AtividadeBase {
                 });
                 legenda.setText(legenda.getText().toString() + "  ✎");
             }
+            legenda.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
             cartao.addView(legenda);
 
+            // Moldura na POSIÇÃO VERTICAL (retrato 3:4), CENTRALIZADA na horizontal.
+            int larguraTela = getResources().getDisplayMetrics().widthPixels;
+            int moldW = Math.min((int) (larguraTela * 0.62f), px(300));
+            int moldH = (int) (moldW * 4f / 3f);
+
             ImageView imagem = new ImageView(this);
-            imagem.setAdjustViewBounds(true);
-            imagem.setMaxHeight(px(230));
-            imagem.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            imagem.setBackground(arredondado(0xFFDCE9F8, px(10), 0xFF9DB8D9, px(1)));
-            imagem.setPadding(px(4), px(4), px(4), px(4));
-            imagem.setMinimumHeight(px(120));
+            imagem.setScaleType(ImageView.ScaleType.FIT_CENTER);
             if (foto != null) {
                 try {
                     byte[] bytes = android.util.Base64.decode(foto.optString("foto"), android.util.Base64.NO_WRAP);
@@ -106,13 +108,35 @@ public class AtividadeGaleria extends AtividadeBase {
                     else ampliar(qual);
                 }
             });
-            cartao.addView(imagem, largura());
+
+            android.widget.FrameLayout molduraF = new android.widget.FrameLayout(this);
+            molduraF.setBackground(arredondado(0xFFDCE9F8, px(10), 0xFF9DB8D9, px(1)));
+            molduraF.setPadding(px(4), px(4), px(4), px(4));
+            molduraF.addView(imagem, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+            TextView marcador = new TextView(this);
+            marcador.setText("📷\nToque para\ninserir a foto");
+            marcador.setTextColor(0xFF6B84A3);
+            marcador.setTextSize(13);
+            marcador.setGravity(android.view.Gravity.CENTER);
+            marcador.setClickable(false);
+            if (foto != null) marcador.setVisibility(android.view.View.GONE);
+            molduraF.addView(marcador, new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+
+            LinearLayout.LayoutParams moldura = new LinearLayout.LayoutParams(moldW, moldH);
+            moldura.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+            moldura.topMargin = px(6);
+            cartao.addView(molduraF, moldura);
 
             TextView dica = new TextView(this);
             dica.setText(foto == null ? "Toque na moldura para inserir a fotografia aqui."
                                       : "Toque na foto para ampliar.");
             dica.setTextColor(CINZA_TEXTO);
             dica.setTextSize(12);
+            dica.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
             dica.setPadding(0, px(4), 0, 0);
             cartao.addView(dica);
 
