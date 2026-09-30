@@ -9,6 +9,7 @@ App Android do memorial do Soldado Especializado (SE) da Aeronáutica. O aplicat
 | `se-cesd.zip` | Pacote original enviado. Fica **intacto**, como cópia de segurança. |
 | `android/` | Projeto Android (Gradle), extraído do zip. Só código: sem caches, chaves nem APKs. |
 | `.github/workflows/build-apk.yml` | Build automático: gera o APK nos servidores do GitHub. |
+| `tools/patch-web.mjs` | Registro das mudanças feitas no site compilado (veja abaixo). |
 
 ## Como baixar o APK
 
@@ -18,6 +19,15 @@ App Android do memorial do Soldado Especializado (SE) da Aeronáutica. O aplicat
 4. Instale no Android (se pedir, permita a instalação por essa fonte).
 
 O build roda sozinho a cada envio de código. Os APKs ficam disponíveis por 30 dias; depois disso basta rodar o build de novo.
+
+## Mudanças feitas no site do app
+
+O site que roda dentro do app está aqui só **compilado**, sem o código-fonte original. As mudanças feitas nele estão registradas, uma a uma, em `tools/patch-web.mjs`:
+
+- **Campo "Insígnia" retirado:** saiu do menu, da página, do rodapé e da abertura (botão "Ver a divisa SE" e espaço "Adicionar imagem"). Isso inclui as abas *Imagem*, *Comparar insígnias* e *Uso regulamentar*. O código delas continua dentro do arquivo compilado, sem uso, e uma imagem já enviada antes segue guardada no aparelho, só não aparece mais.
+- **Fotos e documentos:** os campos de foto aceitam qualquer imagem (PNG, WebP, GIF, BMP, JPG…) de qualquer tamanho e a reduzem automaticamente, como já faziam com JPG. Fotos anexadas como documento também não esbarram mais nos 50 MB. PDF, Word, Excel e outros arquivos não podem ser reduzidos e continuam com o limite de 50 MB. HEIC continua sem suporte, porque o Android não consegue abrir.
+
+Para conferir que o site do repositório bate com o registro: `node tools/patch-web.mjs --check`. Se o código-fonte original aparecer, essas mudanças precisam ser refeitas nele; senão a próxima compilação as desfaz.
 
 ## Assinatura: leia antes de mudar
 

@@ -116,6 +116,14 @@ jobs:
             exit 1
           fi
 
+          # O site embutido no APK precisa ser exatamente o que está no repositório
+          SITE_NO_APK="$(unzip -p dist/SE-CESD.apk assets/web/index.html | sha256sum | cut -d' ' -f1)"
+          SITE_NO_REPO="$(sha256sum android/app/src/main/assets/web/index.html | cut -d' ' -f1)"
+          if [ "$SITE_NO_APK" != "$SITE_NO_REPO" ]; then
+            echo "::error title=Site diferente::O index.html dentro do APK não é o do repositório."
+            exit 1
+          fi
+
           # Resumo que aparece na página da execução
           SHA256="$(sha256sum dist/SE-CESD.apk | cut -d' ' -f1)"
           TAMANHO="$(du -h dist/SE-CESD.apk | cut -f1)"
@@ -130,6 +138,7 @@ jobs:
             echo "| Versão | $VERSAO_NOME (código $VERSAO_CODIGO) |"
             echo "| Tamanho | $TAMANHO |"
             echo "| Assinatura (SHA-1) | \`$CERT_SHA1\` — igual à do APK já instalado ✅ |"
+            echo "| Site dentro do APK | igual ao do repositório ✅ |"
             echo "| SHA-256 do arquivo | \`$SHA256\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
