@@ -425,7 +425,7 @@ public class DriveBackup {
 
         String codigo = null;
         try {
-            servidor.setSoTimeout(300000); // 5 min para o usuário concluir
+            servidor.setSoTimeout(90000); // 90 s: se o navegador não voltar, o app troca o caminho sozinho
             Socket cliente = servidor.accept();
             java.io.BufferedReader entrada = new java.io.BufferedReader(
                     new java.io.InputStreamReader(cliente.getInputStream(), "US-ASCII"));
@@ -566,7 +566,15 @@ public class DriveBackup {
         String renovacao = atividade.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
                 .getString("browserRefreshToken", "");
         if (renovacao.isEmpty()) {
-            loginPeloNavegador();
+            try {
+                loginPeloNavegador();
+            } catch (IOException e) {
+                // Navegador não abreu, não voltou ou foi cancelado: o modo navegador
+                // sai de cena e o app passa a usar a conta Google do aparelho.
+                removerConfigBrowser();
+                throw new IOException(String.valueOf(e.getMessage())
+                        + " Removi o modo navegador — o app agora usa a sua CONTA Google. Toque em \u201cEnviar backup\u201d de novo.");
+            }
             return token;
         }
         String corpo = "client_id=" + URLEncoder.encode(idBrowser(), "UTF-8")
