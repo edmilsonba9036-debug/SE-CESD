@@ -1,0 +1,142 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Gerar APK — compila o app Android "SE • CESD" nos servidores do GitHub.
+#
+# Como baixar o APK (não precisa instalar nada no computador):
+#   1. Abra a aba "Actions" do repositório e clique na execução mais recente
+#      de "Gerar APK" (precisa estar com ✅).
+#   2. Role até a seção "Artifacts" e clique em "SE-CESD.apk".
+#
+# Quando roda: a cada envio de código (push) em qualquer branch e também
+# manualmente, pelo botão "Run workflow" (esse botão só aparece depois que este
+# arquivo estiver na branch main).
+# ──────────────────────────────────────────────────────────────────────────────
+name: Gerar APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Se chegar um envio novo enquanto outro build da mesma branch ainda está
+# rodando, o antigo é cancelado (só o mais recente interessa).
+concurrency:
+  group: gerar-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Identificação do app que já está instalado no celular.
+  PACOTE_ESPERADO: br.org.secesd
+  # Impressão digital (SHA-1) do certificado que assinou o APK atual:
+  # 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D
+  # Um APK assinado com OUTRA chave não instala por cima do app já instalado:
+  # o Android exigiria desinstalar, e isso apagaria os dados locais do app.
+  # Por isso o build falha se a assinatura mudar.
+  CERT_SHA1_ESPERADO: 2532beb9bd657d8c92225a6057a75d370057217d
+
+jobs:
+  apk:
+    name: Compilar e assinar o APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v7
+
+      - name: Instalar o Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # O servidor do GitHub já vem com Gradle 9, que não funciona com o plugin
+      # Android deste projeto (7.4.2). Por isso fixamos o Gradle 7.6.4, o mesmo
+      # com que o APK original foi compilado.
+      - name: Instalar o Gradle 7.6.4
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "7.6.4"
+          cache-provider: basic
+
+      # O servidor do GitHub só traz as plataformas Android 34 ou mais novas;
+      # este projeto compila com a 33.
+      - name: Instalar as peças do Android SDK que o projeto usa
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-33" "build-tools;30.0.3"
+
+      # A chave de teste do APK original está guardada dentro do se-cesd.zip.
+      # Usá-la mantém a mesma assinatura, então o APK novo instala por cima do antigo.
+      - name: Usar a mesma chave de assinatura do APK atual
+        run: |
+          mkdir -p "$HOME/.android"
+          if ! unzip -p se-cesd.zip "se-cesd/.android/debug.keystore" > "$HOME/.android/debug.keystore" \
+             || [ ! -s "$HOME/.android/debug.keystore" ]; then
+            echo "::error title=Chave não encontrada::Não achei se-cesd/.android/debug.keystore dentro do se-cesd.zip."
+            exit 1
+          fi
+
+      - name: Compilar o APK (release)
+        working-directory: android
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Conferir pacote e assinatura
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/SE-CESD.apk
+
+          # Usa as ferramentas (apksigner, aapt2) da versão mais nova instalada.
+          FERRAMENTAS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+
+          # Pacote e versão
+          "$FERRAMENTAS/aapt2" dump badging dist/SE-CESD.apk > badging.txt
+          LINHA_PACOTE="$(grep -m1 '^package:' badging.txt)"
+          echo "$LINHA_PACOTE"
+          [[ "$LINHA_PACOTE" =~ name=\'([^\']+)\' ]] && PACOTE="${BASH_REMATCH[1]}"
+          [[ "$LINHA_PACOTE" =~ versionCode=\'([^\']+)\' ]] && VERSAO_CODIGO="${BASH_REMATCH[1]}"
+          [[ "$LINHA_PACOTE" =~ versionName=\'([^\']+)\' ]] && VERSAO_NOME="${BASH_REMATCH[1]}"
+          if [ "$PACOTE" != "$PACOTE_ESPERADO" ]; then
+            echo "::error title=Pacote diferente::O APK tem o pacote '$PACOTE', mas o esperado é '$PACOTE_ESPERADO'."
+            exit 1
+          fi
+
+          # Assinatura (falha se não bater com a do APK já instalado)
+          "$FERRAMENTAS/apksigner" verify --verbose --print-certs dist/SE-CESD.apk | tee assinatura.txt
+          LINHA_SHA1="$(grep -m1 'certificate SHA-1 digest' assinatura.txt)"
+          CERT_SHA1="${LINHA_SHA1##* }"
+          if [ "${CERT_SHA1,,}" != "${CERT_SHA1_ESPERADO,,}" ]; then
+            echo "::error title=Assinatura diferente::O APK foi assinado com SHA-1 '$CERT_SHA1', mas o esperado é '$CERT_SHA1_ESPERADO'. Ele não instalaria por cima do app atual sem apagar os dados."
+            exit 1
+          fi
+
+          # Resumo que aparece na página da execução
+          SHA256="$(sha256sum dist/SE-CESD.apk | cut -d' ' -f1)"
+          TAMANHO="$(du -h dist/SE-CESD.apk | cut -f1)"
+          {
+            echo "## ✅ APK gerado"
+            echo
+            echo "**Para baixar:** role esta página até **Artifacts** e clique em **SE-CESD.apk**."
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Pacote | \`$PACOTE\` |"
+            echo "| Versão | $VERSAO_NOME (código $VERSAO_CODIGO) |"
+            echo "| Tamanho | $TAMANHO |"
+            echo "| Assinatura (SHA-1) | \`$CERT_SHA1\` — igual à do APK já instalado ✅ |"
+            echo "| SHA-256 do arquivo | \`$SHA256\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar o APK para download
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/SE-CESD.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

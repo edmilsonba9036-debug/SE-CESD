@@ -1,0 +1,17 @@
+# ── Gerados pelo build do Android/Gradle (não devem ir para o Git) ─────────────
+.gradle/
+build/
+.cxx/
+captures/
+local.properties
+.idea/
+*.iml
+
+# ── Caches e pastas pessoais das ferramentas do Android ────────────────────────
+.android/
+
+# ── Chaves e credenciais: nunca colocar no Git ─────────────────────────────────
+*.keystore
+*.jks
+client_secret*.json
+google-services.json
