@@ -7,7 +7,7 @@ import { bitmapComExif, girarBase64, paraBase64Jpeg, lerBytes } from '../lib/ima
 import type { DocSlot } from '../lib/tipos';
 
 const MAXIMO = 4;
-const LIMITE = 4 * 1024 * 1024; // 4 MB
+const LIMITE = 10 * 1024 * 1024; // 10 MB
 
 export default function TelaDocumentos({ avisar }: { avisar: Avisar }) {
   const [documentos, setDocumentos] = useState<(DocSlot | null)[]>([]);
@@ -52,7 +52,7 @@ export default function TelaDocumentos({ avisar }: { avisar: Avisar }) {
       await persistir(nova, 'Documento guardado ✓ criptografado.');
     } catch (erro) {
       avisar(String(erro) === 'Error: muito grande'
-        ? 'Documento muito grande (máximo 4 MB).'
+        ? 'Documento muito grande (máximo 10 MB).'
         : 'Não foi possível inserir o documento.', false);
     }
   }
@@ -140,7 +140,7 @@ export default function TelaDocumentos({ avisar }: { avisar: Avisar }) {
               <p className="mt-2 text-center text-[12px] text-tinta">
                 {d?.doc
                   ? ehPdf ? 'Toque em “Ver páginas” para folhear dentro do app.' : '⟲ gira a imagem 90° anti-horário (fica gravado).'
-                  : 'Toque na moldura para inserir (PDF ou imagem, até 4 MB).'}
+                  : 'Toque na moldura para inserir (PDF ou imagem, até 10 MB).'}
               </p>
 
               {d?.doc && (

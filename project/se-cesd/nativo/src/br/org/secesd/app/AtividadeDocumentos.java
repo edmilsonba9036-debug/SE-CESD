@@ -30,7 +30,7 @@ public class AtividadeDocumentos extends AtividadeBase {
 
     private static final int MAXIMO = 4;
     private static final int PEDIR_DOC = 4312;
-    private static final long TAMANHO_MAXIMO = 4L * 1024 * 1024; // 4 MB
+    private static final long TAMANHO_MAXIMO = 10L * 1024 * 1024; // 10 MB
 
     private JSONArray documentos = new JSONArray();
     private int slotPedindo = -1;
@@ -151,8 +151,8 @@ public class AtividadeDocumentos extends AtividadeBase {
             cartao.addView(quadro, moldura);
 
             TextView dica = new TextView(this);
-            dica.setText(doc == null ? "Toque na moldura para inserir aqui (PDF ou imagem, até 4 MB)."
-                                     : (ehPdf ? "Toque na moldura para ver todas as páginas."
+            dica.setText(doc == null ? "Toque na moldura para inserir aqui (PDF ou imagem, até 10 MB)."
+                                     : (ehPdf ? "Toque na moldura para folhear, página por página."
                                               : "⟲ gira a imagem 90° anti-horário (fica gravado)."));
             dica.setTextColor(CINZA_TEXTO);
             dica.setTextSize(12);
@@ -225,7 +225,7 @@ public class AtividadeDocumentos extends AtividadeBase {
         try {
             byte[] brutos = lerBytes(data.getData());
             if (brutos.length > TAMANHO_MAXIMO) {
-                aviso("Documento muito grande (máximo 4 MB).");
+                aviso("Documento muito grande (máximo 10 MB).");
                 return;
             }
             if (brutos.length == 0) {
@@ -337,52 +337,113 @@ public class AtividadeDocumentos extends AtividadeBase {
         }
     }
 
+    private android.graphics.pdf.PdfRenderer renderizadorPaginas;
+
+    /** Folheia o PDF página por página — cada folha EXPANDIDA na largura da tela. */
     private void verPaginas(final int slot) {
-        JSONObject doc = docDoSlot(slot);
+        final JSONObject doc = docDoSlot(slot);
         if (doc == null) return;
         try {
             byte[] bytes = android.util.Base64.decode(doc.optString("doc"), android.util.Base64.NO_WRAP);
-            java.io.File tmp = new java.io.File(getCacheDir(), "doc-preview.pdf");
+            java.io.File tmp = new java.io.File(getCacheDir(), "doc-view.pdf");
             java.io.FileOutputStream saida = new java.io.FileOutputStream(tmp);
             saida.write(bytes);
             saida.close();
             ParcelFileDescriptor fd = ParcelFileDescriptor.open(tmp, ParcelFileDescriptor.MODE_READ_ONLY);
-            android.graphics.pdf.PdfRenderer render = new android.graphics.pdf.PdfRenderer(fd);
-            int total = Math.min(render.getPageCount(), 5);
-            LinearLayout pilha = new LinearLayout(this);
-            pilha.setOrientation(LinearLayout.VERTICAL);
-            int pad = px(16);
-            pilha.setPadding(pad, pad, pad, pad);
-            for (int i = 0; i < total; i++) {
-                android.graphics.pdf.PdfRenderer.Page p = render.openPage(i);
-                int w = getResources().getDisplayMetrics().widthPixels - pad * 2;
-                int h = Math.max(1, w * p.getHeight() / p.getWidth());
-                Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                b.eraseColor(0xFFFFFFFF);
-                p.render(b, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-                p.close();
-                ImageView iv = new ImageView(this);
-                iv.setImageBitmap(b);
-                iv.setAdjustViewBounds(true);
-                if (i > 0) iv.setPadding(0, px(10), 0, 0);
-                pilha.addView(iv);
-                TextView rot = new TextView(this);
-                rot.setText("página " + (i + 1) + " de " + render.getPageCount());
-                rot.setTextSize(11);
-                rot.setTextColor(CINZA_TEXTO);
-                rot.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
-                pilha.addView(rot);
+            if (renderizadorPaginas != null) {
+                try { renderizadorPaginas.close(); } catch (Exception ignored) { }
             }
-            render.close();
-            ScrollView rolagem = new ScrollView(this);
-            rolagem.addView(pilha);
-            new AlertDialog.Builder(this)
+            renderizadorPaginas = new android.graphics.pdf.PdfRenderer(fd);
+            tmp.delete();
+
+            final int total = renderizadorPaginas.getPageCount();
+            final int[] atual = {0};
+
+            LinearLayout caixa = new LinearLayout(this);
+            caixa.setOrientation(LinearLayout.VERTICAL);
+            int p = px(12);
+            caixa.setPadding(p, p, p, p);
+
+            final ImageView folha = new ImageView(this);
+            folha.setAdjustViewBounds(true);
+            folha.setBackground(arredondado(0xFFFFFFFF, px(6), 0xFFC7D4E6, px(1)));
+            caixa.addView(folha, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            final TextView indicador = new TextView(this);
+            indicador.setGravity(android.view.Gravity.CENTER);
+            indicador.setTextColor(CINZA_TEXTO);
+            indicador.setTextSize(12.5f);
+            indicador.setPadding(0, px(8), 0, 0);
+            caixa.addView(indicador, largura());
+
+            LinearLayout navegar = new LinearLayout(this);
+            navegar.setOrientation(LinearLayout.HORIZONTAL);
+            final View anterior = botao("\u25c0 Anterior", false);
+            final View proxima = botao("Pr\u00f3xima \u25b6", false);
+            LinearLayout.LayoutParams mA = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            LinearLayout.LayoutParams mB = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            mB.leftMargin = px(6);
+            navegar.addView(anterior, mA);
+            navegar.addView(proxima, mB);
+            caixa.addView(navegar, largura());
+
+            final Runnable desenhar = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        android.graphics.pdf.PdfRenderer.Page pg = renderizadorPaginas.openPage(atual[0]);
+                        int w = getResources().getDisplayMetrics().widthPixels - px(56);
+                        int h = Math.max(1, w * pg.getHeight() / pg.getWidth());
+                        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                        b.eraseColor(0xFFFFFFFF);
+                        pg.render(b, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
+                        pg.close();
+                        folha.setImageBitmap(b);
+                        indicador.setText("P\u00e1gina " + (atual[0] + 1) + " de " + total);
+                        anterior.setEnabled(atual[0] > 0);
+                        proxima.setEnabled(atual[0] < total - 1);
+                        anterior.setAlpha(atual[0] > 0 ? 1f : 0.4f);
+                        proxima.setAlpha(atual[0] < total - 1 ? 1f : 0.4f);
+                    } catch (Exception e) {
+                        aviso("Falha ao desenhar a p\u00e1gina.");
+                    }
+                }
+            };
+
+            anterior.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (atual[0] > 0) { atual[0]--; desenhar.run(); }
+                }
+            });
+            proxima.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (atual[0] < total - 1) { atual[0]++; desenhar.run(); }
+                }
+            });
+
+            AlertDialog dialogo = new AlertDialog.Builder(this)
                     .setTitle(doc.optString("legenda", "Documento"))
-                    .setView(rolagem)
+                    .setView(caixa)
                     .setPositiveButton("Fechar", null)
-                    .show();
+                    .create();
+            dialogo.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                @Override
+                public void onDismiss(DialogInterface d) {
+                    if (renderizadorPaginas != null) {
+                        try { renderizadorPaginas.close(); } catch (Exception ignored) { }
+                        renderizadorPaginas = null;
+                    }
+                }
+            });
+            dialogo.show();
+            desenhar.run();
         } catch (Exception e) {
-            aviso("Não consegui abrir as páginas deste documento.");
+            aviso("N\u00e3o consegui abrir as p\u00e1ginas deste documento.");
         }
     }
 
