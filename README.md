@@ -29,3 +29,5 @@ O APK é assinado com a **mesma chave de teste** do APK original, que está dent
 ## Ferramentas do projeto
 
 Java 17, Gradle 7.6.4 e plugin Android 7.4.2 (compileSdk/targetSdk 33, minSdk 26), as mesmas do APK original.
+
+Na página de cada execução aparece um aviso amarelo: *"Gradle 7.6.4 is end-of-life"*. É esperado e não atrapalha o build: são ferramentas de 2023. Atualizá-las é uma tarefa à parte, que pede teste no aparelho.
