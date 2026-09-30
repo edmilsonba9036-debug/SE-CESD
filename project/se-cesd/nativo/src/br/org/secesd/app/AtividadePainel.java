@@ -60,8 +60,6 @@ public class AtividadePainel extends AtividadeBase {
                 "Seus documentos (PDF e imagens), criptografados no cofre", AtividadeDocumentos.class);
 
         coluna.addView(titulo("Institucional"));
-        menu(coluna, "IV", COR_FASE4, "Insígnia & Valores",
-                "A divisa, a causa CESD, valores e postos da FAB", AtividadeMemorial.class);
         menu(coluna, "BK", COR_EXERCITO, "Backup no Google Drive",
                 "Automático, criptografado, no seu Drive", AtividadeBackup.class);
 

@@ -9,7 +9,6 @@ const ITENS: { sigla: string; cor: string; titulo: string; sub: string; tela: Te
   { sigla: 'CD', cor: '#1E5AA8', titulo: 'Meu cadastro', sub: 'Fotografia e dados do Soldado Especializado', tela: 'cadastro' },
   { sigla: 'GA', cor: '#C9A227', titulo: 'Galeria', sub: '4 locais para as fotografias da sua história', tela: 'galeria' },
   { sigla: 'DC', cor: '#C9A227', titulo: 'Documentos', sub: 'Seus documentos (PDF e imagens), criptografados no cofre', tela: 'documentos' },
-  { sigla: 'IV', cor: '#5A6B85', titulo: 'Insígnia & Valores', sub: 'A divisa, a causa CESD, valores e postos da FAB', tela: 'insignia' },
   { sigla: 'BK', cor: '#4B5320', titulo: 'Backup no Google Drive', sub: 'Automático, criptografado, no seu Drive', tela: 'backup' },
 ];
 

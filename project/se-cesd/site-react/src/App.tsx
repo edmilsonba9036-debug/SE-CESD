@@ -9,10 +9,9 @@ import TelaTrajetoria from './telas/TelaTrajetoria';
 import TelaGaleria from './telas/TelaGaleria';
 import TelaDocumentos from './telas/TelaDocumentos';
 import TelaBackup from './telas/TelaBackup';
-import TelaInsignia from './telas/TelaInsignia';
 
 export type Tela = 'painel' | 'cadastro' | 'memorial' | 'trajetoria'
-  | 'galeria' | 'documentos' | 'backup' | 'insignia';
+  | 'galeria' | 'documentos' | 'backup';
 
 export type Avisar = (msg: string, ok?: boolean) => void;
 
@@ -70,7 +69,6 @@ export default function App() {
     galeria: 'Galeria',
     documentos: 'Documentos',
     backup: 'Backup no Google Drive',
-    insignia: 'Insígnia & Valores',
   };
 
   return (
@@ -106,7 +104,6 @@ export default function App() {
         {tela === 'galeria' && <TelaGaleria {...props} />}
         {tela === 'documentos' && <TelaDocumentos {...props} />}
         {tela === 'backup' && <TelaBackup {...props} usuario={usuario} />}
-        {tela === 'insignia' && <TelaInsignia />}
       </main>
     </div>
   );
