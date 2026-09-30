@@ -300,11 +300,12 @@ public class DriveBackup {
                 t.contains("invalid") || t.contains("unregistered") || t.contains("unsuccessful")
                         || t.contains("client") || t.contains("notfound") || t.equals("null");
         if (naoReconhece) {
-            return "O Google não reconheceu este app para o Drive. No Google Cloud Console → APIs e "
-                    + "Serviços → Credenciais, confirme que existe um cliente OAuth do tipo ANDROID com "
-                    + "Nome do pacote = br.org.secesd.debug e SHA-1 = 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:"
-                    + "A7:5D:37:00:57:21:7D. Em Tela de consentimento → Usuários de teste, adicione a sua "
-                    + "conta Google. Aguarde 5 minutos, reinicie o Wi-Fi/dados e toque em Conectar de novo. "
+            return "O Google ainda não conhece este app. Faça uma vez só, no navegador do computador ou celular:\n"
+                    + "1) Abra console.cloud.google.com e entre com a sua conta Google.\n"
+                    + "2) Toque em APIs e Serviços → Credenciais → + Criar credenciais → ID do cliente OAuth → escolha Android.\n"
+                    + "3) Cole exatamente: Nome do pacote: br.org.secesd.debug\nSHA-1: 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D\n"
+                    + "4) Em Tela de consentimento → Usuários de teste → adicione a sua conta Google.\n"
+                    + "5) Espere 5 minutos, feche e abra o app e toque em Conectar de novo.\n"
                     + "(Detalhe técnico: " + detalhe + ")";
         }
         if (t.contains("network")) {
@@ -475,7 +476,17 @@ public class DriveBackup {
                 + "&redirect_uri=" + URLEncoder.encode(redirect, "UTF-8")
                 + "&grant_type=authorization_code"
                 + "&code_verifier=" + URLEncoder.encode(verificador, "UTF-8");
-        JSONObject resposta = postarFormulario(TOKEN_ENDPOINT, corpo);
+        JSONObject resposta;
+        try {
+            resposta = postarFormulario(TOKEN_ENDPOINT, corpo);
+        } catch (IOException e) {
+            String m = String.valueOf(e.getMessage());
+            if (m.contains("HTTP 400") || m.contains("HTTP 401")) {
+                removerConfigBrowser();
+                throw new IOException("O Google recusou o login do navegador (ID ou segredo do cliente inválidos). Toque em “Conectar ao Drive” e use a sua conta Google.");
+            }
+            throw e;
+        }
         salvarTokens(resposta);
         avisar("Conectado pelo navegador ✓", true);
     }
@@ -562,7 +573,16 @@ public class DriveBackup {
                 + "&client_secret=" + URLEncoder.encode(segredoBrowser(), "UTF-8")
                 + "&grant_type=refresh_token"
                 + "&refresh_token=" + URLEncoder.encode(renovacao, "UTF-8");
-        salvarTokens(postarFormulario(TOKEN_ENDPOINT, corpo));
+        try {
+            salvarTokens(postarFormulario(TOKEN_ENDPOINT, corpo));
+        } catch (IOException e) {
+            String m = String.valueOf(e.getMessage());
+            if (m.contains("HTTP 400") || m.contains("HTTP 401")) {
+                removerConfigBrowser();
+                throw new IOException("O login pelo navegador foi recusado pelo Google (ID ou segredo inválidos). Toque em “Conectar ao Drive” e use a sua conta Google.");
+            }
+            throw e;
+        }
         return token;
     }
 
@@ -767,6 +787,7 @@ public class DriveBackup {
             e.remove("safPastaUri");
         } else {
             e.putString("safPastaUri", uri.toString());
+            e.putInt("safRecusas", 0);
         }
         e.apply();
     }
@@ -837,18 +858,30 @@ public class DriveBackup {
 
         Uri alvo = existente;
         if (alvo == null) {
-            try {
-                alvo = DocumentsContract.createDocument(r, pasta, "application/json", NOME_ARQUIVO);
-            } catch (SecurityException e) {
-                throw new IOException("O Android negou a permissão de gravar nessa pasta. Toque em “Trocar pasta do backup…” e escolha de novo.");
-            } catch (IllegalArgumentException e) {
-                throw new IOException("Essa pasta não aceita criar arquivos pelo seletor (o Drive às vezes entrega a pasta de um jeito que o Android não consegue gravar). Em “Trocar pasta do backup…”, escolha a pasta navegando: Drive → Meu Drive → sua pasta. Ou use a conta Google, que o app envia sozinho.");
-            } catch (Exception e) {
-                throw new IOException("O Drive recusou criar o arquivo (" + detalhe(e) + "). Tente “Trocar pasta do backup…”.");
+            // O Drive às vezes recusa criar com um tipo MIME, mas aceita com outro.
+            // Tenta 3 tipos e, se preciso, dá uma segunda rodada (o provedor aquece).
+            String[] tipos = {"application/json", "application/octet-stream", "text/plain"};
+            IOException ultimoErro = null;
+            for (int rodada = 0; rodada < 2 && alvo == null; rodada++) {
+                for (String tipo : tipos) {
+                    try {
+                        alvo = DocumentsContract.createDocument(r, pasta, tipo, NOME_ARQUIVO);
+                    } catch (SecurityException e) {
+                        throw new IOException("O Android negou a permissão de gravar nessa pasta. Toque em “Trocar pasta do backup…” e escolha de novo.");
+                    } catch (IllegalArgumentException e) {
+                        ultimoErro = new IOException("Essa pasta não aceita criar arquivos pelo seletor. Em “Trocar pasta do backup…”, escolha a pasta navegando: Drive → Meu Drive → sua pasta. Ou use a conta Google, que o app envia sozinho.");
+                        alvo = null;
+                    } catch (Exception e) {
+                        ultimoErro = new IOException("O Drive recusou criar o arquivo (" + detalhe(e) + "). Tente “Trocar pasta do backup…”.");
+                        alvo = null;
+                    }
+                    if (alvo != null) break;
+                }
             }
-        }
-        if (alvo == null) {
-            throw new IOException("Não foi possível criar o arquivo na pasta escolhida. Tente “Trocar pasta do backup…”.");
+            if (alvo == null) {
+                throw ultimoErro != null ? ultimoErro
+                        : new IOException("Não foi possível criar o arquivo na pasta escolhida. Tente “Trocar pasta do backup…”.");
+            }
         }
 
         OutputStream saida = null;
@@ -895,7 +928,8 @@ public class DriveBackup {
         String m = String.valueOf(e.getMessage());
         return m.contains("não aceita criar arquivos") || m.contains("não permite escrita")
                 || m.contains("negou") || m.contains("recusou criar o arquivo")
-                || m.contains("Não foi possível criar o arquivo") || m.contains("ler a pasta");
+                || m.contains("Não foi possível criar o arquivo") || m.contains("ler a pasta")
+                || m.contains("Falha ao gravar");
     }
 
     /** Envio inteligente: pasta escolhida (SAF) quando houver; senão conta Google.
