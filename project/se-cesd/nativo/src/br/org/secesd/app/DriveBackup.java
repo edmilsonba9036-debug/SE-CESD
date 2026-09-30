@@ -971,8 +971,12 @@ public class DriveBackup {
                 }
             });
         } else if (temSaf()) {
+            // Terceira recusa seguida: desiste do seletor de vez — remove a pasta
+            // escolhida e passa a enviar sempre pela conta Google, sem mais avisos.
+            definirSafPasta(null);
             if (!quieto) {
-                avisar("O seletor continua recusando essa pasta — enviando pela sua conta Google (pasta \u201c"
+                avisar("O seletor recusou essa pasta de novo — removi ela das opções. "
+                        + "O backup agora vai sempre pela sua conta Google (pasta \u201c"
                         + nomePastaAtual() + "\u201d).", true);
             }
             iniciar(Acao.ENVIAR, cofreJson, quieto);

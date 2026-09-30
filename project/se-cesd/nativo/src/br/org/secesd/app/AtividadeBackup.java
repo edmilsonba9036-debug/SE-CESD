@@ -199,6 +199,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     @Override
     public void status(String mensagem, boolean ok) {
         ultimoErro = ok ? null : mensagem;
+        if (pastaEscolhida != null) mostrarPasta(); // a pasta pode ter sido removida pelo app
         if (copiarErro != null) {
             copiarErro.setVisibility(ok ? android.view.View.GONE : android.view.View.VISIBLE);
         }
