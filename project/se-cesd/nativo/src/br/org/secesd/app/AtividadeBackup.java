@@ -207,10 +207,90 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 + "mantendo só a versão mais recente. Com o automático LIGADO, qualquer alteração "
                 + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
 
+        coluna.addView(titulo("Segurança"));
+        View trocarSenha = botao("Trocar senha do cofre…", false);
+        trocarSenha.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) { dialogoTrocarSenha(); }
+        });
+        coluna.addView(trocarSenha, largura());
+        coluna.addView(texto("A senha nova re-criptografa tudo neste aparelho e o backup é atualizado "
+                + "no Drive automaticamente. Em outro aparelho, entre com a senha nova e toque em Restaurar do Drive."));
+
         setContentView(rolagem);
 
         // Cria/verifica a pasta do Drive automaticamente, sem tocar em nada.
         drive.criarPastaAutomatica();
+    }
+
+    private void dialogoTrocarSenha() {
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        int p = px(20);
+        caixa.setPadding(p, p / 2, p, 0);
+        final android.widget.EditText atual = campoSenha("Senha atual");
+        final android.widget.EditText nova = campoSenha("Nova senha (mínimo 8 caracteres)");
+        final android.widget.EditText conf = campoSenha("Confirmar nova senha");
+        caixa.addView(atual);
+        caixa.addView(nova);
+        caixa.addView(conf);
+
+        AlertDialog d = new AlertDialog.Builder(this)
+                .setTitle("Trocar senha do cofre")
+                .setMessage("O cofre será re-criptografado com a nova senha e o backup será atualizado no Drive.")
+                .setView(caixa)
+                .setPositiveButton("Trocar senha", null)
+                .setNegativeButton("Cancelar", null)
+                .create();
+        d.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override
+            public void onShow(final DialogInterface di) {
+                ((AlertDialog) di).getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final String sAtual = atual.getText().toString();
+                        final String sNova = nova.getText().toString();
+                        if (!sNova.equals(conf.getText().toString())) {
+                            aviso("As senhas novas não são iguais.");
+                            return;
+                        }
+                        ((AlertDialog) di).dismiss();
+                        aviso("Trocando a senha…");
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                final String erro = Cofre.trocarSenha(AtividadeBackup.this,
+                                        Cofre.usuarioGravado(AtividadeBackup.this), sAtual, sNova);
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (erro != null) {
+                                            aviso(erro);
+                                            return;
+                                        }
+                                        aviso("Senha trocada ✓ Atualizando o backup no Drive…");
+                                        try {
+                                            drive.enviarSmart(Cofre.exportar(AtividadeBackup.this), false);
+                                        } catch (Exception e) {
+                                            aviso("Senha trocada ✓ — toque em Enviar backup para atualizar o Drive.");
+                                        }
+                                    }
+                                });
+                            }
+                        }).start();
+                    }
+                });
+            }
+        });
+        d.show();
+    }
+
+    private android.widget.EditText campoSenha(String dica) {
+        android.widget.EditText campo = new android.widget.EditText(this);
+        campo.setHint(dica);
+        campo.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        return campo;
     }
 
     @Override

@@ -125,6 +125,46 @@ public final class Cofre {
         usuarioSessao = null;
     }
 
+    /**
+     * Troca a senha do cofre: prova a senha atual, re-criptografa os dados
+     * com um sal e chave novos e mantém a sessão aberta. Devolve erro ou null.
+     */
+    public static String trocarSenha(Context ctx, String usuario, String senhaAtual, String novaSenha) {
+        try {
+            String e = abrir(ctx, usuario, senhaAtual);
+            if (e != null) return e;
+            if (novaSenha == null || novaSenha.length() < 8) return "Use pelo menos 8 caracteres na nova senha.";
+            if (novaSenha.toLowerCase().contains(usuario.toLowerCase())) return "A nova senha não pode conter o usuário.";
+            if (novaSenha.equals(senhaAtual)) return "A nova senha precisa ser diferente da atual.";
+
+            JSONObject c = lerBruto(ctx);
+            byte[] dados = Base64.decode(c.getString("dados"), Base64.NO_WRAP);
+            byte[] ivDados = Base64.decode(c.getString("ivDados"), Base64.NO_WRAP);
+            String abertos = decifrar(chaveSessao, ivDados, dados);
+
+            byte[] novoSal = aleatorio(16);
+            SecretKey novaChave = chave(novaSenha.toCharArray(), novoSal);
+            byte[] novoIvVerif = aleatorio(12);
+            byte[] verif = cifrar(novaChave, novoIvVerif, MARCA_VERIFICADOR);
+            byte[] novoIvDados = aleatorio(12);
+            byte[] novosDados = cifrar(novaChave, novoIvDados, abertos);
+
+            c.put("sal", Base64.encodeToString(novoSal, Base64.NO_WRAP));
+            c.put("ivVerif", Base64.encodeToString(novoIvVerif, Base64.NO_WRAP));
+            c.put("verif", Base64.encodeToString(verif, Base64.NO_WRAP));
+            c.put("ivDados", Base64.encodeToString(novoIvDados, Base64.NO_WRAP));
+            c.put("dados", Base64.encodeToString(novosDados, Base64.NO_WRAP));
+            gravar(ctx, c.toString());
+
+            chaveSessao = novaChave; // sessão segue aberta, já com a nova senha
+            ctx.getSharedPreferences("drive-backup", Context.MODE_PRIVATE)
+                    .edit().putBoolean("pendenteEnviar", true).apply();
+            return null;
+        } catch (Exception e) {
+            return "Não foi possível trocar a senha: " + mensagem(e);
+        }
+    }
+
     /** Lê os registros (decifrados). Chamar com sessão aberta. */
     public static JSONObject lerDados(Context ctx) throws Exception {
         JSONObject c = lerBruto(ctx);
