@@ -3,6 +3,7 @@ package br.org.secesd.app;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -23,6 +24,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private android.widget.Button botaoEscolherPasta;
     private android.widget.Button botaoPastaConta;
     private android.widget.Button copiarErro;
+    private android.widget.Button abrirCadastro;
     private String ultimoErro;
     private static final int PEDIR_PASTA = 4404;
     private static final int PEDIR_ARQUIVO = 4405;
@@ -186,6 +188,21 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         });
         coluna.addView(copiarErro, largura());
 
+        abrirCadastro = botao("🌐 Abrir o cadastro no Google (5 min)", false);
+        abrirCadastro.setVisibility(android.view.View.GONE);
+        abrirCadastro.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW,
+                            Uri.parse("https://console.cloud.google.com/apis/credentials?project=stone-host-510104-n1")));
+                } catch (Exception e) {
+                    aviso("Abra no navegador: console.cloud.google.com → Credenciais");
+                }
+            }
+        });
+        coluna.addView(abrirCadastro, largura());
+
         coluna.addView(texto("\nArquivo único SE-CESD-backup.json: cada envio atualiza o mesmo arquivo, "
                 + "mantendo só a versão mais recente. Com o automático LIGADO, qualquer alteração "
                 + "(fato, foto, cadastro) vai ao Drive sozinha quando você sai da tela. Nada é legível sem a sua senha; em trânsito há TLS."));
@@ -202,6 +219,10 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         if (pastaEscolhida != null) mostrarPasta(); // a pasta pode ter sido removida pelo app
         if (copiarErro != null) {
             copiarErro.setVisibility(ok ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
+        if (abrirCadastro != null) {
+            boolean mostra = !ok && mensagem != null && mensagem.contains("ainda não conhece");
+            abrirCadastro.setVisibility(mostra ? android.view.View.VISIBLE : android.view.View.GONE);
         }
         if (status != null) {
             status.setText(mensagem);

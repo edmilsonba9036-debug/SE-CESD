@@ -300,12 +300,13 @@ public class DriveBackup {
                 t.contains("invalid") || t.contains("unregistered") || t.contains("unsuccessful")
                         || t.contains("client") || t.contains("notfound") || t.equals("null");
         if (naoReconhece) {
-            return "O Google ainda não conhece este app. Faça uma vez só, no navegador do computador ou celular:\n"
-                    + "1) Abra console.cloud.google.com e entre com a sua conta Google.\n"
-                    + "2) Toque em APIs e Serviços → Credenciais → + Criar credenciais → ID do cliente OAuth → escolha Android.\n"
-                    + "3) Cole exatamente: Nome do pacote: br.org.secesd.debug\nSHA-1: 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D\n"
-                    + "4) Em Tela de consentimento → Usuários de teste → adicione a sua conta Google.\n"
-                    + "5) Espere 5 minutos, feche e abra o app e toque em Conectar de novo.\n"
+            return "O Google ainda não conhece este app — cadastro único (5 min). "
+                    + "Toque no botão \u201cAbrir o cadastro no Google\u201d logo abaixo. Lá no site, faça só isto:\n"
+                    + "1) Credenciais → + Criar credenciais → ID do cliente OAuth → tipo Android.\n"
+                    + "2) Nome do pacote: br.org.secesd.debug\n    SHA-1: 25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D\n"
+                    + "3) Tela de permissão → Usuários de teste → adicione o SEU Gmail.\n"
+                    + "4) Espere 5 minutos e toque em \u201cEnviar backup\u201d de novo.\n"
+                    + "Alternativa sem cadastro: use o botão \u201cEscolher pasta do backup…\u201d (navegue: Drive → Meu Drive → pasta).\n"
                     + "(Detalhe técnico: " + detalhe + ")";
         }
         if (t.contains("network")) {
