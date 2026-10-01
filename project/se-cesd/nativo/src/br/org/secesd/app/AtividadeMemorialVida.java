@@ -174,7 +174,7 @@ public class AtividadeMemorialVida extends AtividadeBase {
         fData = campo("Data (AAAA-MM-DD)");
         fData.setInputType(android.text.InputType.TYPE_CLASS_DATETIME);
         fLocal = campo("Unidade/Cidade (ex.: 3ª Cia — Exército; CESD — FAB)");
-        fDescricao = campoMultilinha("Conte essa história com suas palavras.", 8);
+        fDescricao = campoMultilinha("Conte essa história com suas palavras.", 12);
         formF.addView(fTitulo, largura());
         formF.addView(fData, largura());
         formF.addView(fLocal, largura());
@@ -546,7 +546,7 @@ public class AtividadeMemorialVida extends AtividadeBase {
         final EditText data = campo("Data (AAAA-MM-DD)");
         data.setInputType(InputType.TYPE_CLASS_DATETIME);
         final EditText local = campo("Unidade/Cidade (ex.: 3ª Cia — Exército; CESD — FAB)");
-        final EditText descricao = campoMultilinha("Conte essa história com suas palavras.", 8);
+        final EditText descricao = campoMultilinha("Conte essa história com suas palavras.", 12);
         formulario.addView(titulo);
         formulario.addView(data, largura());
         formulario.addView(local, largura());

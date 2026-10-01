@@ -128,6 +128,7 @@ public class AtividadeDocumentos extends AtividadeBase {
                 public void onClick(View v) {
                     if (docDoSlot(qual) == null) escolher(qual);
                     else if ("pdf".equals(docDoSlot(qual).optString("tipo"))) verPaginas(qual);
+                    else verImagem(qual);
                 }
             });
 
@@ -152,8 +153,8 @@ public class AtividadeDocumentos extends AtividadeBase {
 
             TextView dica = new TextView(this);
             dica.setText(doc == null ? "Toque na moldura para inserir aqui (PDF ou imagem, até 10 MB)."
-                                     : (ehPdf ? "Toque na moldura para folhear, página por página."
-                                              : "⟲ gira a imagem 90° anti-horário (fica gravado)."));
+                                     : (ehPdf ? "Toque na moldura para folhear; toque 2× na página para ampliar."
+                                              : "Toque na moldura para ampliar (pinça ou toque 2×); ⟲ gira."));
             dica.setTextColor(CINZA_TEXTO);
             dica.setTextSize(12);
             dica.setGravity(android.view.Gravity.CENTER_HORIZONTAL);
@@ -364,11 +365,11 @@ public class AtividadeDocumentos extends AtividadeBase {
             int p = px(12);
             caixa.setPadding(p, p, p, p);
 
-            final ImageView folha = new ImageView(this);
-            folha.setAdjustViewBounds(true);
+            final ImagemComZoomView folha = new ImagemComZoomView(this);
             folha.setBackground(arredondado(0xFFFFFFFF, px(6), 0xFFC7D4E6, px(1)));
+            int altTela = getResources().getDisplayMetrics().heightPixels;
             caixa.addView(folha, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                    ViewGroup.LayoutParams.MATCH_PARENT, (int) (altTela * 0.62f)));
 
             final TextView indicador = new TextView(this);
             indicador.setGravity(android.view.Gravity.CENTER);
@@ -402,7 +403,7 @@ public class AtividadeDocumentos extends AtividadeBase {
                         pg.render(b, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
                         pg.close();
                         folha.setImageBitmap(b);
-                        indicador.setText("P\u00e1gina " + (atual[0] + 1) + " de " + total);
+                        indicador.setText("P\u00e1gina " + (atual[0] + 1) + " de " + total + "  \u00b7  toque 2\u00d7 para ampliar");
                         anterior.setEnabled(atual[0] > 0);
                         proxima.setEnabled(atual[0] < total - 1);
                         anterior.setAlpha(atual[0] > 0 ? 1f : 0.4f);
@@ -444,6 +445,36 @@ public class AtividadeDocumentos extends AtividadeBase {
             desenhar.run();
         } catch (Exception e) {
             aviso("N\u00e3o consegui abrir as p\u00e1ginas deste documento.");
+        }
+    }
+
+    /** Amplia a imagem do slot para leitura: pinça, arrastar ou toque duplo. */
+    private void verImagem(int slot) {
+        JSONObject doc = docDoSlot(slot);
+        if (doc == null) return;
+        try {
+            byte[] bytes = android.util.Base64.decode(doc.optString("doc"), android.util.Base64.NO_WRAP);
+            Bitmap b = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            if (b == null) {
+                aviso("Não consegui abrir esta imagem.");
+                return;
+            }
+            ImagemComZoomView zoom = new ImagemComZoomView(this);
+            zoom.setImageBitmap(b);
+            int altTela = getResources().getDisplayMetrics().heightPixels;
+            LinearLayout caixa = new LinearLayout(this);
+            caixa.setOrientation(LinearLayout.VERTICAL);
+            int p = px(12);
+            caixa.setPadding(p, p, p, p);
+            caixa.addView(zoom, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, (int) (altTela * 0.66f)));
+            new AlertDialog.Builder(this)
+                    .setTitle(doc.optString("legenda", "Documento") + " — toque 2× para ampliar")
+                    .setView(caixa)
+                    .setPositiveButton("Fechar", null)
+                    .show();
+        } catch (Exception e) {
+            aviso("Não consegui abrir esta imagem.");
         }
     }
 
