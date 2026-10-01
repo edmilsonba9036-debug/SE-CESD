@@ -84,6 +84,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 boolean novo = !DriveBackup.autoAtivo(AtividadeBackup.this);
                 DriveBackup.definirAuto(AtividadeBackup.this, novo);
                 botaoAuto.setText(rotuloAuto());
+                pintarBotaoAuto();
                 atualizarDiagnostico();
                 aviso(novo ? "Backup automático ATIVADO: o app envia sozinho ao sair das telas."
                            : "Backup automático DESATIVADO: envie pelo botão quando quiser.");
@@ -377,6 +378,22 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         }).start();
     }
 
+    /** Verde claro quando o automático está saudável: LIGADO + conta conectada + sem pausa. */
+    private void pintarBotaoAuto() {
+        if (botaoAuto == null) return;
+        android.content.SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
+        boolean saudavel = DriveBackup.autoAtivo(this)
+                && p.getString("contaNome", null) != null
+                && System.currentTimeMillis() >= p.getLong("autoPausaAte", 0);
+        if (saudavel) {
+            botaoAuto.setBackground(arredondado(0xFFDFF5E0, px(16), 0xFF2E7D5B, px(1)));
+            botaoAuto.setTextColor(0xFF2E7D5B);
+        } else {
+            botaoAuto.setBackground(arredondado(0xFFFFFFFF, px(16), 0xFFC9D8EA, px(1)));
+            botaoAuto.setTextColor(AZUL_MARINHA);
+        }
+    }
+
     private static String quando(long t) {
         if (t <= 0) return "nunca";
         return new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
@@ -386,6 +403,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     /** Mostra, em linguagem clara, por onde o backup automático está andando. */
     private void atualizarDiagnostico() {
         if (diagnostico == null) return;
+        pintarBotaoAuto();
         android.content.SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
         StringBuilder b = new StringBuilder("COMO ESTÁ O BACKUP AUTOMÁTICO\n");
         b.append("• Automático: ").append(DriveBackup.autoAtivo(this) ? "LIGADO" : "DESLIGADO").append('\n');
