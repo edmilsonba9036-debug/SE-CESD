@@ -1074,13 +1074,15 @@ public class DriveBackup {
             moverParaCESD(t, id);
             return id;
         }
-        String raiz = garantirPastaCESD(t);
+        String raiz = localizarPastaCESD(t);
         JSONObject meta = new JSONObject();
         meta.put("name", nomePastaAtual());
         meta.put("mimeType", "application/vnd.google-apps.folder");
-        org.json.JSONArray paisRaiz = new org.json.JSONArray();
-        paisRaiz.put(raiz);
-        meta.put("parents", paisRaiz);
+        if (raiz != null) {
+            org.json.JSONArray paisRaiz = new org.json.JSONArray();
+            paisRaiz.put(raiz);
+            meta.put("parents", paisRaiz);
+        }
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
@@ -1250,13 +1252,15 @@ public class DriveBackup {
             moverParaCESD(t, id);
             return id;
         }
-        String raiz = garantirPastaCESD(t);
+        String raiz = localizarPastaCESD(t);
         JSONObject meta = new JSONObject();
         meta.put("name", PASTA_CANC);
         meta.put("mimeType", "application/vnd.google-apps.folder");
-        org.json.JSONArray paisMusicas = new org.json.JSONArray();
-        paisMusicas.put(raiz);
-        meta.put("parents", paisMusicas);
+        if (raiz != null) {
+            org.json.JSONArray paisMusicas = new org.json.JSONArray();
+            paisMusicas.put(raiz);
+            meta.put("parents", paisMusicas);
+        }
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
@@ -1267,22 +1271,27 @@ public class DriveBackup {
         return new JSONObject(corpo).getString("id");
     }
 
-    /** Pasta-mãe "CESD" no Drive (cria se não existir). Backup e canções ficam dentro dela. */
-    private String garantirPastaCESD(String t) throws Exception {
-        String q = "name='CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-        String id = primeiro(buscar(t, q));
+    /**
+     * Localiza a pasta CESD QUE O USUÁRIO JÁ TEM no Drive (dentro de MILIT).
+     * NUNCA cria pasta: se não achar, devolve null e o app segue sem mexer.
+     */
+    private String localizarPastaCESD(String t) throws Exception {
+        // 1º: CESD dentro de MILIT (é onde ela fica no seu Drive)
+        String qMilit = "name='MILIT' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        String militId = primeiro(buscar(t, qMilit));
+        if (militId != null) {
+            String q = "name='CESD' and '" + militId
+                    + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+            String cesd = primeiro(buscar(t, q));
+            if (cesd != null) return cesd;
+        }
+        // 2º: CESD com nome exato em qualquer lugar
+        String q2 = "name='CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        String id = primeiro(buscar(t, q2));
         if (id != null) return id;
-        JSONObject meta = new JSONObject();
-        meta.put("name", "CESD");
-        meta.put("mimeType", "application/vnd.google-apps.folder");
-        HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
-        int codigo = conn.getResponseCode();
-        String corpo = ler(conn, codigo);
-        conn.disconnect();
-        if (codigo < 200 || codigo >= 300) throw new IOException("HTTP " + codigo + " ao criar a pasta CESD.");
-        return new JSONObject(corpo).getString("id");
+        // 3º: nome parecido (Milit, Cesd, MILITAR…) — "contains" acha parte do nome
+        String q3 = "name contains 'CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        return primeiro(buscar(t, q3));
     }
 
     /**
@@ -1292,7 +1301,8 @@ public class DriveBackup {
      */
     private void moverParaCESD(String t, String pastaId) {
         try {
-            String raiz = garantirPastaCESD(t);
+            String raiz = localizarPastaCESD(t);
+            if (raiz == null) return;
             HttpURLConnection g = abrir(API + "files/" + pastaId + "?fields=parents", t, "GET");
             int cg = g.getResponseCode();
             String corpoG = ler(g, cg);
