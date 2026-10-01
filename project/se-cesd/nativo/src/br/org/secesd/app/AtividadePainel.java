@@ -30,10 +30,6 @@ public class AtividadePainel extends AtividadeBase {
         LinearLayout coluna = coluna(rolagem);
 
         LinearLayout cartao = cartao();
-        SabreAladoView emblema = new SabreAladoView(this);
-        LinearLayout.LayoutParams lpEmblema = new LinearLayout.LayoutParams(px(64), px(64));
-        lpEmblema.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        cartao.addView(emblema, lpEmblema);
         TextView bemVindo = new TextView(this);
         bemVindo.setText("Bem-vindo, " + Cofre.usuarioSessao + "!");
         bemVindo.setGravity(android.view.Gravity.CENTER);
@@ -41,6 +37,14 @@ public class AtividadePainel extends AtividadeBase {
         bemVindo.setTextSize(16);
         bemVindo.setTypeface(Typeface.DEFAULT_BOLD);
         cartao.addView(bemVindo);
+
+        // BRASA.O DO CESD abaixo da saudacao
+        android.widget.ImageView brasao = new android.widget.ImageView(this);
+        brasao.setImageResource(br.org.secesd.debug.R.drawable.brasao_cesd);
+        android.widget.LinearLayout.LayoutParams lpBrasao = new android.widget.LinearLayout.LayoutParams(px(140), px(140));
+        lpBrasao.topMargin = px(10);
+        lpBrasao.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        cartao.addView(brasao, lpBrasao);
         TextView nota = new TextView(this);
         nota.setText("Seus registros ficam só neste aparelho, criptografados com a sua senha — "
                 + "e vão ao Drive automaticamente quando você conecta o backup.");
