@@ -18,6 +18,25 @@ import android.widget.TextView;
 public class AtividadePainel extends AtividadeBase {
 
     private View farol;
+    private android.widget.Button botaoMusica;
+    private TextView textoMusica;
+    private final android.os.Handler relogioMusica = new android.os.Handler();
+
+
+    private String rotuloMusica() {
+        if (!PlayerMusicas.tocando()) return "▶  Tocar canções militares";
+        return "⏹  Parar a música";
+    }
+
+    private void atualizarMusica() {
+        if (botaoMusica == null || textoMusica == null) return;
+        botaoMusica.setText(rotuloMusica());
+        if (PlayerMusicas.tocando()) {
+            textoMusica.setText("♪  " + PlayerMusicas.tituloAtual());
+        } else {
+            textoMusica.setText("(parado)");
+        }
+    }
 
     /** Verde: automatico LIGADO + conta conectada + sem pausa. Vermelho: o contrario. */
     private int corFarol() {
@@ -53,6 +72,30 @@ public class AtividadePainel extends AtividadeBase {
     protected void onResume() {
         super.onResume();
         recolorirFarol();
+        atualizarMusica();
+        relogioMusica.postDelayed(tiqueMusica, 800);
+    }
+
+    private final Runnable tiqueMusica = new Runnable() {
+        @Override
+        public void run() {
+            atualizarMusica();
+            if (isFinishing()) return;
+            relogioMusica.postDelayed(this, 800);
+        }
+    };
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        relogioMusica.removeCallbacks(tiqueMusica);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        relogioMusica.removeCallbacks(tiqueMusica);
+        PlayerMusicas.parar();
     }
 
     @Override
@@ -102,6 +145,36 @@ public class AtividadePainel extends AtividadeBase {
         coluna.addView(titulo("Institucional"));
         menu(coluna, "BK", COR_EXERCITO, "Backup no Google Drive",
                 "Automático, criptografado, no seu Drive", AtividadeBackup.class);
+
+        // CANCOES MILITARES — toca direto da internet
+        coluna.addView(titulo("Canções militares"));
+        LinearLayout cartaoMusica = cartao();
+        botaoMusica = botao(rotuloMusica(), true);
+        botaoMusica.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                PlayerMusicas.alternar(AtividadePainel.this);
+                atualizarMusica();
+            }
+        });
+        cartaoMusica.addView(botaoMusica, largura());
+        textoMusica = texto("");
+        textoMusica.setGravity(android.view.Gravity.CENTER);
+        textoMusica.setTypeface(Typeface.DEFAULT_BOLD);
+        textoMusica.setPadding(0, px(10), 0, 0);
+        textoMusica.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                PlayerMusicas.proxima(AtividadePainel.this);
+                atualizarMusica();
+            }
+        });
+        cartaoMusica.addView(textoMusica, largura());
+        TextView dicaMusica = texto("Toque no nome da canção para trocar. Músicas vêm da internet (usa seus dados móveis).");
+        dicaMusica.setTextSize(12);
+        dicaMusica.setGravity(android.view.Gravity.CENTER);
+        cartaoMusica.addView(dicaMusica, largura());
+        coluna.addView(cartaoMusica, largura());
 
         LinearLayout linhaFim = new LinearLayout(this);
         linhaFim.setOrientation(LinearLayout.HORIZONTAL);
