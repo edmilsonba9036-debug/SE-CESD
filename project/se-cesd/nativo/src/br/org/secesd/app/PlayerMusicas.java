@@ -96,6 +96,26 @@ public final class PlayerMusicas {
         return URLS[indice % URLS.length];
     }
 
+    /** Índice da canção atual. */
+    public static synchronized int indiceAtual() {
+        return indice % TITULOS.length;
+    }
+
+    /** Título da canção na posição i do repertório. */
+    public static synchronized String tituloEm(int i) {
+        return TITULOS[i % TITULOS.length];
+    }
+
+    /** URL da canção na posição i do repertório. */
+    public static synchronized String urlEm(int i) {
+        return URLS[i % URLS.length];
+    }
+
+    /** Cópia da lista de títulos do repertório atual. */
+    public static synchronized String[] listaTitulos() {
+        return TITULOS.clone();
+    }
+
     public static synchronized int total() {
         return TITULOS.length;
     }
@@ -150,6 +170,22 @@ public final class PlayerMusicas {
         } else {
             indice = (indice + 1) % TITULOS.length;
         }
+    }
+
+    /** Toca a canção ESCOLHIDA pelo usuário no repertório atual (sem nova busca). */
+    public static synchronized void tocarIndice(final Context ctx, final int i) {
+        carregando = true;
+        falhasSeguidas = 0;
+        final int alvo = i % TITULOS.length;
+        indice = alvo;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (PlayerMusicas.class) {
+                    tocar(ctx.getApplicationContext(), alvo);
+                }
+            }
+        }).start();
     }
 
     public static synchronized void parar() {

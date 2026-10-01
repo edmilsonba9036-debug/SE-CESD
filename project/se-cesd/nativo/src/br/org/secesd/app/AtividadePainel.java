@@ -22,6 +22,7 @@ public class AtividadePainel extends AtividadeBase {
     private TextView textoMusica;
     private TextView dicaMusica;
     private android.widget.Button botaoBaixarMusica;
+    private android.widget.Button botaoListaMusica;
     private final android.os.Handler relogioMusica = new android.os.Handler();
 
 
@@ -185,7 +186,15 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(botaoBaixarMusica, largura());
-        dicaMusica = texto("Banco das 3 Forças + descobertas ao vivo a cada toque.");
+        botaoListaMusica = botao("☰  Escolher canção do repertório", false);
+        botaoListaMusica.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                escolherMusica();
+            }
+        });
+        cartaoMusica.addView(botaoListaMusica, largura());
+        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher · ⬇ baixar");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
@@ -304,8 +313,54 @@ public class AtividadePainel extends AtividadeBase {
     }
 
     private void baixarMusicaNoDrive() {
-        final String titulo = PlayerMusicas.tituloAtual();
-        final String url = PlayerMusicas.urlAtual();
+        iniciarDownload(PlayerMusicas.indiceAtual());
+    }
+
+    /** Lista o repertório; toque numa canção para ouvir ou baixar. */
+    private void escolherMusica() {
+        final String[] titulos = PlayerMusicas.listaTitulos();
+        if (titulos == null || titulos.length == 0) {
+            android.widget.Toast.makeText(this,
+                    "Toque ▶ uma vez para montar o repertório.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Repertório — " + titulos.length + " canções")
+                .setItems(titulos, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        perguntarOuvirOuBaixar(qual, titulos[qual]);
+                    }
+                })
+                .setNegativeButton("Fechar", null)
+                .show();
+    }
+
+    private void perguntarOuvirOuBaixar(final int faixa, String titulo) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("♪ " + titulo)
+                .setMessage("O que você quer fazer com esta canção?")
+                .setPositiveButton("Ouvir agora", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        PlayerMusicas.tocarIndice(AtividadePainel.this, faixa);
+                        atualizarMusica();
+                    }
+                })
+                .setNegativeButton("Baixar no Drive", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        iniciarDownload(faixa);
+                    }
+                })
+                .setNeutralButton("Cancelar", null)
+                .show();
+    }
+
+    private void iniciarDownload(final int faixa) {
+        final String titulo = PlayerMusicas.tituloEm(faixa);
+        final String url = PlayerMusicas.urlEm(faixa);
         if (url == null || titulo == null || titulo.isEmpty()) {
             android.widget.Toast.makeText(this,
                     "Toque ▶ e deixe uma canção tocar antes de baixar.",
