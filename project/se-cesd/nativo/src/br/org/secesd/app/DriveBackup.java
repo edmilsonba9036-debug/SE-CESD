@@ -1276,22 +1276,26 @@ public class DriveBackup {
      * NUNCA cria pasta: se não achar, devolve null e o app segue sem mexer.
      */
     private String localizarPastaCESD(String t) throws Exception {
-        // 1º: CESD dentro de MILIT (é onde ela fica no seu Drive)
+        // 1º: "CESD 26" dentro de MILIT (é onde ela fica no seu Drive)
         String qMilit = "name='MILIT' and mimeType='application/vnd.google-apps.folder' and trashed=false";
         String militId = primeiro(buscar(t, qMilit));
         if (militId != null) {
-            String q = "name='CESD' and '" + militId
+            String q = "name='CESD 26' and '" + militId
                     + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
             String cesd = primeiro(buscar(t, q));
             if (cesd != null) return cesd;
         }
-        // 2º: CESD com nome exato em qualquer lugar
-        String q2 = "name='CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        // 2º: "CESD 26" com nome exato em qualquer lugar do Drive
+        String q2 = "name='CESD 26' and mimeType='application/vnd.google-apps.folder' and trashed=false";
         String id = primeiro(buscar(t, q2));
         if (id != null) return id;
-        // 3º: nome parecido (Milit, Cesd, MILITAR…) — "contains" acha parte do nome
-        String q3 = "name contains 'CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-        return primeiro(buscar(t, q3));
+        // 3º: nome contendo "CESD 26" (aceita variação de maiúsculas/minúsculas)
+        String q3 = "name contains 'CESD 26' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        String id3 = primeiro(buscar(t, q3));
+        if (id3 != null) return id3;
+        // 4º: reserva escrita sem espaço ("CESD26")
+        String q4 = "name contains 'CESD26' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        return primeiro(buscar(t, q4));
     }
 
     /**
