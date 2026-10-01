@@ -20,6 +20,7 @@ public class AtividadePainel extends AtividadeBase {
     private View farol;
     private android.widget.Button botaoMusica;
     private TextView textoMusica;
+    private TextView dicaMusica;
     private final android.os.Handler relogioMusica = new android.os.Handler();
 
 
@@ -36,6 +37,9 @@ public class AtividadePainel extends AtividadeBase {
         } else {
             textoMusica.setText("(parado)");
         }
+        dicaMusica.setText("Repertório: " + PlayerMusicas.total() + " canções militares do Brasil"
+                + (PlayerMusicas.catalogoDaInternet() ? " (buscado da internet ✓)" : " (lista interna — sem internet)")
+                + " · toque no nome para trocar");
     }
 
     /** Verde: automatico LIGADO + conta conectada + sem pausa. Vermelho: o contrario. */
@@ -170,7 +174,7 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(textoMusica, largura());
-        TextView dicaMusica = texto("Toque no nome da canção para trocar. Músicas vêm da internet (usa seus dados móveis).");
+        dicaMusica = texto("Repertório buscado da internet a cada toque.");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
