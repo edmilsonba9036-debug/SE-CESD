@@ -42,8 +42,8 @@ public abstract class AtividadeBase extends Activity {
     protected ScrollView tela(String titulo, String subtitulo) {
         ScrollView rolagem = new ScrollView(this);
         rolagem.setFillViewport(true);
-        GradientDrawable fundo = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF071638, AZUL_MARINHA, 0xFF16407F});
+        GradientDrawable fundo = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF030B1F, 0xFF071638, AZUL_MARINHA, 0xFF16407F, 0xFF1E5AA8});
         rolagem.setBackground(fundo);
 
         LinearLayout raiz = new LinearLayout(this);
@@ -144,8 +144,8 @@ public abstract class AtividadeBase extends Activity {
         e.setHintTextColor(0xFF8A9BB5);
         e.setTextSize(15);
         e.setSingleLine(true);
-        e.setBackground(arredondado(0xFFF3F7FC, px(12), 0xFFD5E2F1, px(1)));
-        e.setPadding(px(14), px(12), px(14), px(12));
+        e.setBackground(arredondado(0xFFFFFFFF, px(14), 0xFFD9E4F2, px(1)));
+        e.setPadding(px(16), px(13), px(16), px(13));
         return e;
     }
 
@@ -165,15 +165,26 @@ public abstract class AtividadeBase extends Activity {
         b.setTypeface(Typeface.DEFAULT_BOLD);
         if (primario) {
             b.setTextColor(Color.WHITE);
-            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{AZUL_MARINHA, AZUL_MEDIO});
-            g.setCornerRadius(px(14));
+            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                    new int[]{AZUL_MARINHA, 0xFF1E5AA8});
+            g.setCornerRadius(px(16));
             b.setBackground(g);
+            b.setElevation(px(4));
         } else {
             b.setTextColor(AZUL_MARINHA);
-            b.setBackground(arredondado(0xFFE3EDF9, px(14), 0, 0));
+            b.setBackground(arredondado(0xFFFFFFFF, px(16), 0xFFC9D8EA, px(1)));
         }
-        b.setPadding(0, px(12), 0, px(12));
+        b.setPadding(0, px(13), 0, px(13));
+        b.setHapticFeedbackEnabled(true);
+        b.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent evento) {
+                if (evento.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                }
+                return false; // não consome o clique
+            }
+        });
         return b;
     }
 
@@ -236,13 +247,13 @@ public abstract class AtividadeBase extends Activity {
         cartao.setOrientation(LinearLayout.VERTICAL);
         int p = px(14);
         cartao.setPadding(p, p, p, p);
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(Color.WHITE);
-        g.setCornerRadius(px(16));
-        g.setStroke(px(1), 0xFFE1E9F4);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.WHITE, 0xFFFAFCFF});
+        g.setCornerRadius(px(22));
+        g.setStroke(px(1), 0xFFE6EEF8);
         cartao.setBackground(g);
-        // elevação suave
-        cartao.setElevation(px(2));
+        // elevação macia
+        cartao.setElevation(px(5));
         return cartao;
     }
 

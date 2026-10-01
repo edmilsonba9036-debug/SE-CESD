@@ -30,8 +30,13 @@ public class AtividadePainel extends AtividadeBase {
         LinearLayout coluna = coluna(rolagem);
 
         LinearLayout cartao = cartao();
+        SabreAladoView emblema = new SabreAladoView(this);
+        LinearLayout.LayoutParams lpEmblema = new LinearLayout.LayoutParams(px(64), px(64));
+        lpEmblema.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+        cartao.addView(emblema, lpEmblema);
         TextView bemVindo = new TextView(this);
         bemVindo.setText("Bem-vindo, " + Cofre.usuarioSessao + "!");
+        bemVindo.setGravity(android.view.Gravity.CENTER);
         bemVindo.setTextColor(AZUL_MARINHA);
         bemVindo.setTextSize(16);
         bemVindo.setTypeface(Typeface.DEFAULT_BOLD);
@@ -41,6 +46,7 @@ public class AtividadePainel extends AtividadeBase {
                 + "e vão ao Drive automaticamente quando você conecta o backup.");
         nota.setTextColor(CINZA_TEXTO);
         nota.setTextSize(13);
+        nota.setGravity(android.view.Gravity.CENTER);
         nota.setPadding(0, px(4), 0, 0);
         cartao.addView(nota);
         coluna.addView(cartao, largura());

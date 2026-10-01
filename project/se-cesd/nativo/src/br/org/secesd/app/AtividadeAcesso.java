@@ -44,25 +44,49 @@ public class AtividadeAcesso extends AtividadeBase {
         ScrollView rolagem = tela(titulo, subtitulo);
         LinearLayout coluna = coluna(rolagem);
 
-        TextView marca = new TextView(this);
-        marca.setText("SE • CESD\nSOLDADO ESPECIALIZADO DA AERONÁUTICA");
-        marca.setTextColor(AZUL_MARINHA);
-        marca.setTextSize(13);
-        marca.setTypeface(Typeface.DEFAULT_BOLD);
-        marca.setLineSpacing(px(3), 1f);
-        coluna.addView(marca);
-        coluna.addView(espaco(10));
+        // Medalhão com o SABRE ALADO da Aeronáutica
+        LinearLayout medalhao = new LinearLayout(this);
+        medalhao.setOrientation(LinearLayout.VERTICAL);
+        medalhao.setGravity(android.view.Gravity.CENTER);
+        android.graphics.drawable.GradientDrawable fundoMedalhao = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFF0A2463, 0xFF16407F});
+        fundoMedalhao.setCornerRadius(px(30));
+        medalhao.setBackground(fundoMedalhao);
+        int pm = px(22);
+        medalhao.setPadding(pm, px(26), pm, px(20));
+
+        SabreAladoView sabre = new SabreAladoView(this);
+        medalhao.addView(sabre, new LinearLayout.LayoutParams(px(120), px(120)));
+
+        TextView monograma = new TextView(this);
+        monograma.setText("SE • CESD");
+        monograma.setTextColor(OURO);
+        monograma.setTextSize(17);
+        monograma.setTypeface(Typeface.DEFAULT_BOLD);
+        monograma.setLetterSpacing(0.22f);
+        monograma.setPadding(0, px(12), 0, 0);
+        medalhao.addView(monograma);
+
+        TextView legenda = new TextView(this);
+        legenda.setText("SOLDADO ESPECIALIZADO DA AERONÁUTICA");
+        legenda.setTextColor(0xFFC6D6EE);
+        legenda.setTextSize(10.5f);
+        legenda.setLetterSpacing(0.10f);
+        legenda.setPadding(0, px(4), 0, 0);
+        medalhao.addView(legenda);
+
+        coluna.addView(medalhao, largura());
+        coluna.addView(espaco(12));
 
         campoUsuario = campo("Usuário");
         coluna.addView(campoUsuario, largura());
         campoSenha = campo(criando ? "Senha (mínimo 8 caracteres)" : "Senha");
-        campoSenha.setTransformationMethod(new android.text.method.PasswordTransformationMethod());
-        coluna.addView(campoSenha, largura());
+        coluna.addView(linhaSenha(campoSenha), largura());
         campoConfirmar = null;
         if (criando) {
             campoConfirmar = campo("Confirmar senha");
-            campoConfirmar.setTransformationMethod(new android.text.method.PasswordTransformationMethod());
-            coluna.addView(campoConfirmar, largura());
+            coluna.addView(linhaSenha(campoConfirmar), largura());
 
             TextView nota = new TextView(this);
             nota.setText("Anote sua senha em local seguro. Por segurança, ela não pode ser recuperada: "
@@ -94,6 +118,42 @@ public class AtividadeAcesso extends AtividadeBase {
             coluna.addView(nota);
         }
         setContentView(rolagem);
+    }
+
+    /** Campo de senha com botão 👁 para mostrar/ocultar. */
+    private LinearLayout linhaSenha(final EditText campoDeSenha) {
+        campoDeSenha.setTransformationMethod(new android.text.method.PasswordTransformationMethod());
+        LinearLayout linha = new LinearLayout(this);
+        linha.setOrientation(LinearLayout.HORIZONTAL);
+        linha.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams peso = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        linha.addView(campoDeSenha, peso);
+
+        final android.widget.Button olho = new android.widget.Button(this);
+        olho.setText("👁");
+        olho.setAllCaps(false);
+        olho.setTextSize(16);
+        olho.setBackground(arredondado(0xFFFFFFFF, px(14), 0xFFD9E4F2, px(1)));
+        olho.setPadding(px(10), px(6), px(10), px(6));
+        LinearLayout.LayoutParams lpOlho = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lpOlho.leftMargin = px(8);
+        linha.addView(olho, lpOlho);
+
+        olho.setOnClickListener(new View.OnClickListener() {
+            boolean visivel = false;
+
+            @Override
+            public void onClick(View v) {
+                visivel = !visivel;
+                campoDeSenha.setTransformationMethod(visivel ? null
+                        : new android.text.method.PasswordTransformationMethod());
+                olho.setText(visivel ? "🙈" : "👁");
+                campoDeSenha.setSelection(campoDeSenha.getText().length());
+            }
+        });
+        return linha;
     }
 
     private void confirmar() {
