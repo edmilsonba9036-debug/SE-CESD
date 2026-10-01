@@ -118,9 +118,7 @@ public class AtividadeAcesso extends AtividadeBase {
                     entradaDigital();
                 }
             });
-            LinearLayout.LayoutParams lpDigital = (LinearLayout.LayoutParams) btnDigital.getLayoutParams();
-            lpDigital.topMargin = px(10);
-            coluna.addView(btnDigital, lpDigital);
+            coluna.addView(btnDigital, largura());
 
             TextView dicaDigital = new TextView(this);
             dicaDigital.setText(Digital.habilitada(this)
