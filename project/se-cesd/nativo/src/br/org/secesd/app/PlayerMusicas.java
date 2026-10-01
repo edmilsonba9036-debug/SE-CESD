@@ -32,7 +32,8 @@ public final class PlayerMusicas {
             "banda de musica militar hino",
             "dobrado militar banda",
             "hino marinha exercito aeronautica",
-            "canção militar brasileira"
+            "canção militar brasileira",
+            "ardor do infante"
     };
 
     /** Palavras-chave que confirmam que o resultado é mesmo canção militar. */

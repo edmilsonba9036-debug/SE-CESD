@@ -193,7 +193,7 @@ public class AtividadePainel extends AtividadeBase {
                 finish();
             }
         });
-        View apagar = botao("Apagar tudo", false);
+        View apagar = botao("Apagar tudo 🔒", false);
         apagar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -295,10 +295,44 @@ public class AtividadePainel extends AtividadeBase {
     }
 
     private void confirmarApagar() {
+        // 1ª trava: só abre o apagão quem digitar a SENHA DE ACESSO
+        final android.widget.EditText campo = new android.widget.EditText(this);
+        campo.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        campo.setHint("Sua senha de acesso");
+        campo.setTextSize(16);
+        int pad = px(16);
+        campo.setPadding(pad, pad, pad, pad);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Senha para apagar 🔒")
+                .setMessage("O botão Apagar tudo agora pede a sua senha de acesso. "
+                        + "Digite-a para liberar o apagão.")
+                .setView(campo)
+                .setPositiveButton("Liberar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        String digitada = campo.getText().toString();
+                        String usuario = Cofre.usuarioGravado(AtividadePainel.this);
+                        String erro = Cofre.verificarSenha(AtividadePainel.this, usuario, digitada);
+                        if (erro != null) {
+                            android.widget.Toast.makeText(AtividadePainel.this,
+                                    "Senha incorreta — apagão não liberado.",
+                                    android.widget.Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        confirmarApagarComSenha();
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void confirmarApagarComSenha() {
+        // 2ª trava: confirmação final (como já era)
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Apagar tudo e criar um novo acesso?")
-                .setMessage("Por segurança, a senha não pode ser recuperada, e sem ela não há como abrir os dados. "
-                        + "Esta ação apaga todos os registros deste aparelho.")
+                .setMessage("Senha aceita ✓. Por segurança, a senha não pode ser recuperada, e sem ela "
+                        + "não há como abrir os dados. Esta ação apaga todos os registros deste aparelho.")
                 .setPositiveButton("Apagar tudo", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
