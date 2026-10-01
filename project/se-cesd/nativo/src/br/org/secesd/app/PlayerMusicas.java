@@ -5,29 +5,47 @@ import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.net.Uri;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
- * Player das canções militares: toca direto da internet (streaming),
- * uma após a outra, sem guardar nada no aparelho.
- *
- * A cada toque, o app BUSCA NA INTERNET o repertório atual (catálogo
- * publicado no repositório do projeto, com canções das Forças Armadas
- * brasileiras). Se a busca falhar, usa a lista interna de segurança.
- * Fontes ruins são puladas automaticamente.
+ * Player das canções militares com BUSCA EM TEMPO REAL: a cada toque,
+ * o app pergunta à internet (Internet Archive e Wikimedia Commons)
+ * quais são as canções militares disponíveis naquele momento — de
+ * preferência brasileiras, das Forças Armadas — e monta o repertório
+ * na hora, ordenado pelas mais populares. Se a busca falhar, toca a
+ * lista interna de segurança. Nada fica programado: cada toque é uma
+ * busca nova.
  */
 public final class PlayerMusicas {
 
-    private static final String CATALOGO_URL =
-            "https://raw.githubusercontent.com/edmilsonba9036-debug/SE-CESD"
-          + "/arena/01a0ee2d-se-cesd/project/se-cesd/catalogo-musicas.json";
+    private static final String[] TERMOS = {
+            "hino militar brasileiro",
+            "banda de musica militar hino",
+            "dobrado militar banda",
+            "hino marinha exercito aeronautica",
+            "canção militar brasileira"
+    };
 
-    /** Lista interna de segurança (se a busca do catálogo falhar). */
+    /** Palavras-chave que confirmam que o resultado é mesmo canção militar. */
+    private static final String[] PALAVRAS = {
+            "hino", "canção", "cancao", "dobrado", "banda", "militar", "marinha",
+            "exército", "exercito", "aeronáutica", "aeronautica", "fuzileiros",
+            "bandeira", "independência", "independencia", "proclamação",
+            "proclamacao", "expedicionário", "expedicionario", "aviação",
+            "aviacao", "cisne", "viracopos", "soldado", "herói", "heroi",
+            "farda", "céu", "ceu", "sargento", "escola naval", "feb"
+    };
+
+    /** Lista interna de segurança (se a busca em tempo real falhar). */
     private static volatile String[] TITULOS = {
             "Hino da Aviação — Banda da Marinha",
             "Canção do Expedicionário (FEB) — Banda da Marinha",
@@ -53,8 +71,9 @@ public final class PlayerMusicas {
     private static boolean tocando = false;
     private static boolean carregando = false;
     private static int falhasSeguidas = 0;
-    private static long catalogoEm = 0;   // quando o catálogo veio da internet
-    private static int catalogoTotal = 0; // canções recebidas da internet
+    private static int contadorBuscas = 0;
+    private static volatile boolean buscaOk = false;   // última busca achou na internet
+    private static volatile String termoUsado = "";
 
     private PlayerMusicas() {}
 
@@ -70,9 +89,13 @@ public final class PlayerMusicas {
         return TITULOS.length;
     }
 
-    /** O repertório atual veio da internet? */
-    public static synchronized boolean catalogoDaInternet() {
-        return catalogoEm > 0;
+    /** A última montagem de repertório veio da busca em tempo real? */
+    public static synchronized boolean buscaEmTempoRealOk() {
+        return buscaOk;
+    }
+
+    public static synchronized String termoBuscado() {
+        return termoUsado;
     }
 
     /** Toca/para. Devolve o novo estado (true = tocando). */
@@ -86,16 +109,16 @@ public final class PlayerMusicas {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                atualizarCatalogo();
+                buscarEmTempoReal();
                 synchronized (PlayerMusicas.class) {
-                    tocar(ctx.getApplicationContext(), indice % TITULOS.length);
+                    tocar(ctx.getApplicationContext(), 0);
                 }
             }
         }).start();
         return true;
     }
 
-    /** Troca para a próxima canção (buscando o repertório de novo). */
+    /** Troca para a próxima canção (com busca nova em tempo real). */
     public static synchronized void proxima(final Context ctx) {
         if (tocando || carregando) {
             carregando = true;
@@ -103,7 +126,7 @@ public final class PlayerMusicas {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    atualizarCatalogo();
+                    buscarEmTempoReal();
                     synchronized (PlayerMusicas.class) {
                         tocar(ctx.getApplicationContext(), alvo % TITULOS.length);
                     }
@@ -120,46 +143,164 @@ public final class PlayerMusicas {
         liberarPlayer();
     }
 
-    /** Busca na internet o repertório atual (silencioso em caso de falha). */
-    private static void atualizarCatalogo() {
-        try {
-            HttpURLConnection c = (HttpURLConnection) new URL(CATALOGO_URL).openConnection();
-            c.setConnectTimeout(4000);
-            c.setReadTimeout(6000);
-            c.setRequestProperty("Accept", "application/json");
-            int codigo = c.getResponseCode();
-            InputStream f = codigo >= 200 && codigo < 300 ? c.getInputStream() : c.getErrorStream();
-            if (f == null) return;
-            ByteArrayOutputStream saida = new ByteArrayOutputStream();
-            byte[] p = new byte[4096];
-            int n;
-            while ((n = f.read(p)) != -1) saida.write(p, 0, n);
-            f.close();
-            c.disconnect();
-            JSONObject raiz = new JSONObject(saida.toString("UTF-8"));
-            org.json.JSONArray lista = raiz.optJSONArray("musicas");
-            if (lista == null || lista.length() == 0) return;
-            java.util.ArrayList<String> titulos = new java.util.ArrayList<String>();
-            java.util.ArrayList<String> urls = new java.util.ArrayList<String>();
-            for (int i = 0; i < lista.length(); i++) {
-                JSONObject m = lista.optJSONObject(i);
-                if (m == null) continue;
-                String t = m.optString("titulo", "").trim();
-                String u = m.optString("url", "").trim();
-                String o = m.optString("origem", "").trim();
-                if (t.isEmpty() || u.isEmpty() || !u.startsWith("http")) continue;
-                titulos.add(t + (o.isEmpty() ? "" : " — " + o));
-                urls.add(u);
+    // ------------------------------------------------------------------
+    // BUSCA EM TEMPO REAL
+    // ------------------------------------------------------------------
+
+    /** Monta o repertório agora: pergunta ao Archive e ao Commons. */
+    private static void buscarEmTempoReal() {
+        String termo = TERMOS[contadorBuscas++ % TERMOS.length];
+        ArrayList<String> titulos = new ArrayList<String>();
+        ArrayList<String> urls = new ArrayList<String>();
+        HashSet<String> usadas = new HashSet<String>();
+
+        buscarNoArchive(termo, titulos, urls, usadas);
+        if (titulos.size() < 8) buscarNoCommons(termo, titulos, urls, usadas);
+
+        if (!titulos.isEmpty()) {
+            // completa com a lista interna de segurança (sem repetir URL)
+            for (int i = 0; i < TITULOS.length; i++) {
+                if (urls.size() >= 20) break;
+                if (usadas.contains(URLS[i])) continue;
+                usadas.add(URLS[i]);
+                titulos.add(TITULOS[i]);
+                urls.add(URLS[i]);
             }
-            if (titulos.isEmpty()) return;
             TITULOS = titulos.toArray(new String[0]);
             URLS = urls.toArray(new String[0]);
-            catalogoEm = System.currentTimeMillis();
-            catalogoTotal = TITULOS.length;
-        } catch (Exception ignorado) {
-            // sem internet ou catálogo fora do ar: fica a lista interna
+            buscaOk = true;
+            termoUsado = termo;
+        } else {
+            buscaOk = false;
         }
     }
+
+    /** Internet Archive: as gravações mais baixadas que casam com o termo. */
+    private static void buscarNoArchive(String termo, ArrayList<String> titulos,
+                                        ArrayList<String> urls, HashSet<String> usadas) {
+        try {
+            String q = URLEncoder.encode(termo + " AND mediatype:audio", "UTF-8");
+            String u = "https://archive.org/advancedsearch.php?q=" + q
+                    + "&fl%5B%5D=identifier&fl%5B%5D=title&rows=25"
+                    + "&sort%5B%5D=downloads+desc&output=json";
+            String corpo = baixar(u, 6000, 8000);
+            JSONArray docs = new JSONObject(corpo)
+                    .getJSONObject("response").optJSONArray("docs");
+            if (docs == null) return;
+            int achados = 0;
+            for (int i = 0; i < docs.length() && achados < 6; i++) {
+                JSONObject doc = docs.optJSONObject(i);
+                if (doc == null) continue;
+                String id = doc.optString("identifier", "");
+                String titulo = doc.optString("title", "");
+                if (id.isEmpty()) continue;
+                if (!pareceMilitar(titulo)) continue;
+                String audio = primeiroAudioDoItem(id);
+                if (audio == null || usadas.contains(audio)) continue;
+                usadas.add(audio);
+                titulos.add(resumir(titulo) + " · Archive.org");
+                urls.add(audio);
+                achados++;
+            }
+        } catch (Exception ignorado) {
+        }
+    }
+
+    /** Wikimedia Commons: áudios (ogg) que casam com o termo. */
+    private static void buscarNoCommons(String termo, ArrayList<String> titulos,
+                                        ArrayList<String> urls, HashSet<String> usadas) {
+        try {
+            String q = URLEncoder.encode(termo + " filemime:audio/ogg", "UTF-8");
+            String u = "https://commons.wikimedia.org/w/api.php?action=query&generator=search"
+                    + "&gsrsearch=" + q + "&gsrnamespace=6&gsrlimit=15"
+                    + "&prop=imageinfo&iiprop=url&format=json";
+            String corpo = baixar(u, 5000, 7000);
+            JSONObject paginas = new JSONObject(corpo).getJSONObject("query")
+                    .optJSONObject("pages");
+            if (paginas == null) return;
+            JSONArray chaves = paginas.names();
+            if (chaves == null) return;
+            int achados = 0;
+            for (int i = 0; i < chaves.length() && achados < 4; i++) {
+                JSONObject pg = paginas.optJSONObject(chaves.getString(i));
+                if (pg == null) continue;
+                String titulo = pg.optString("title", "");
+                JSONArray infos = pg.optJSONArray("imageinfo");
+                if (infos == null || infos.length() == 0) continue;
+                String url = infos.optJSONObject(0).optString("url", "");
+                if (url.isEmpty() || usadas.contains(url)) continue;
+                if (!pareceMilitar(titulo)) continue;
+                usadas.add(url);
+                titulos.add(resumir(titulo.replaceAll("^File:", "")) + " · Commons");
+                urls.add(url);
+                achados++;
+            }
+        } catch (Exception ignorado) {
+        }
+    }
+
+    /** Pega o primeiro MP3/OGG de um item do Archive. */
+    private static String primeiroAudioDoItem(String id) {
+        try {
+            String corpo = baixar("https://archive.org/metadata/" + URLEncoder.encode(id, "UTF-8"),
+                    5000, 7000);
+            JSONArray arquivos = new JSONObject(corpo).optJSONArray("files");
+            if (arquivos == null) return null;
+            String reserva = null;
+            for (int i = 0; i < arquivos.length(); i++) {
+                JSONObject f = arquivos.optJSONObject(i);
+                if (f == null) continue;
+                String nome = f.optString("name", "");
+                String formato = f.optString("format", "").toLowerCase();
+                String baixo = nome.toLowerCase();
+                boolean audio = formato.contains("mp3") || formato.contains("vorbis")
+                        || baixo.endsWith(".mp3") || baixo.endsWith(".ogg") || baixo.endsWith(".oga");
+                if (!audio) continue;
+                if (formato.contains("peaks") || formato.contains("spectrogram")) continue;
+                String url = "https://archive.org/download/" + id + "/"
+                        + URLEncoder.encode(nome, "UTF-8").replace("+", "%20");
+                if (formato.contains("mp3") || baixo.endsWith(".mp3")) return url;
+                if (reserva == null) reserva = url;
+            }
+            return reserva;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean pareceMilitar(String t) {
+        String s = t.toLowerCase();
+        for (String p : PALAVRAS) {
+            if (s.contains(p)) return true;
+        }
+        return false;
+    }
+
+    private static String resumir(String s) {
+        if (s.length() > 58) return s.substring(0, 58) + "…";
+        return s;
+    }
+
+    private static String baixar(String url, int tempoConexao, int tempoLeitura) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(tempoConexao);
+        c.setReadTimeout(tempoLeitura);
+        c.setRequestProperty("Accept", "application/json,audio/*;q=0.9,*/*;q=0.5");
+        int codigo = c.getResponseCode();
+        InputStream f = codigo >= 200 && codigo < 300 ? c.getInputStream() : c.getErrorStream();
+        if (f == null) throw new Exception("HTTP " + codigo);
+        ByteArrayOutputStream saida = new ByteArrayOutputStream();
+        byte[] p = new byte[4096];
+        int n;
+        while ((n = f.read(p)) != -1) saida.write(p, 0, n);
+        f.close();
+        c.disconnect();
+        return saida.toString("UTF-8");
+    }
+
+    // ------------------------------------------------------------------
+    // REPRODUÇÃO
+    // ------------------------------------------------------------------
 
     private static void liberarPlayer() {
         if (player != null) {
