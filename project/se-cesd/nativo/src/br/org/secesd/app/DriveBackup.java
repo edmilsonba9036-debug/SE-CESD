@@ -1095,7 +1095,30 @@ public class DriveBackup {
 
     private String localizarPasta(String t) throws Exception {
         String q = "name='" + nomePastaAtual() + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-        return primeiro(buscar(t, q));
+        org.json.JSONArray achadas = buscar(t, q);
+        String cesd = localizarPastaCESD(t);
+        String id = null;
+        if (cesd != null) id = escolherDentroDoCESD(achadas, cesd);
+        if (id == null) id = primeiro(achadas);
+        return id;
+    }
+
+    /** Entre pastas de mesmo nome, prefere a que JÁ está dentro do CESD 26. */
+    private String escolherDentroDoCESD(org.json.JSONArray arquivos, String cesdId) {
+        if (arquivos == null || cesdId == null) return null;
+        String primeiroId = null;
+        for (int i = 0; i < arquivos.length(); i++) {
+            JSONObject f = arquivos.optJSONObject(i);
+            if (f == null) continue;
+            if (primeiroId == null) primeiroId = f.optString("id", null);
+            org.json.JSONArray pais = f.optJSONArray("parents");
+            if (pais != null) {
+                for (int j = 0; j < pais.length(); j++) {
+                    if (cesdId.equals(pais.optString(j))) return f.optString("id", null);
+                }
+            }
+        }
+        return null;
     }
 
     private String localizarArquivo(String t, String pastaId) throws Exception {
@@ -1107,7 +1130,7 @@ public class DriveBackup {
 
     private org.json.JSONArray buscar(String t, String q) throws Exception {
         HttpURLConnection conn = abrir(API + "files?q=" + URLEncoder.encode(q, "UTF-8")
-                + "&spaces=drive&fields=files(id,name)&pageSize=5", t, "GET");
+                + "&spaces=drive&fields=files(id,name,parents)&pageSize=5", t, "GET");
         int codigo = conn.getResponseCode();
         String corpo = ler(conn, codigo);
         conn.disconnect();
@@ -1247,7 +1270,11 @@ public class DriveBackup {
 
     private String garantirPastaMusicas(String t) throws Exception {
         String q = "name='" + PASTA_CANC + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-        String id = primeiro(buscar(t, q));
+        org.json.JSONArray achadas = buscar(t, q);
+        String cesd = localizarPastaCESD(t);
+        String id = null;
+        if (cesd != null) id = escolherDentroDoCESD(achadas, cesd);
+        if (id == null) id = primeiro(achadas);
         if (id != null) {
             moverParaCESD(t, id);
             return id;
@@ -1313,9 +1340,35 @@ public class DriveBackup {
             g.disconnect();
             if (cg < 200 || cg >= 300) return;
             org.json.JSONArray atuais = new JSONObject(corpoG).optJSONArray("parents");
-            if (atuais == null || atuais.length() != 1) return; // já organizada ou caso raro: não mexe
+            if (atuais == null || atuais.length() == 0) return;
+            boolean dentro = false;
+            for (int i = 0; i < atuais.length(); i++) {
+                if (raiz.equals(atuais.optString(i))) dentro = true;
+            }
+            if (dentro) {
+                if (atuais.length() == 1) return; // JÁ está certa (caso do usuário): não mexe em nada
+                // Ficou com pai duplicado (raiz + CESD 26): limpa os extras
+                StringBuilder extras = new StringBuilder();
+                for (int i = 0; i < atuais.length(); i++) {
+                    String p = atuais.optString(i);
+                    if (!raiz.equals(p) && !p.isEmpty()) {
+                        if (extras.length() > 0) extras.append(',');
+                        extras.append(p);
+                    }
+                }
+                if (extras.length() == 0) return;
+                HttpURLConnection c2 = abrir(API + "files/" + pastaId
+                        + "?removeParents=" + URLEncoder.encode(extras.toString(), "UTF-8")
+                        + "&fields=id", t, "PATCH");
+                c2.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                escrever(c2, "{}".getBytes(StandardCharsets.UTF_8));
+                ler(c2, c2.getResponseCode());
+                c2.disconnect();
+                return;
+            }
+            if (atuais.length() != 1) return; // caso raro: não mexe
             String atual = atuais.optString(0, "");
-            if (atual.isEmpty() || raiz.equals(atual)) return; // já está dentro de CESD
+            if (atual.isEmpty()) return;
             String url = API + "files/" + pastaId + "?addParents=" + raiz
                     + "&removeParents=" + URLEncoder.encode(atual, "UTF-8") + "&fields=id";
             HttpURLConnection conn = abrir(url, t, "PATCH");
