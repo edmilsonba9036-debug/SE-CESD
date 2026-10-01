@@ -45,8 +45,12 @@ public final class PlayerMusicas {
             "farda", "céu", "ceu", "sargento", "escola naval", "feb"
     };
 
-    /** Lista interna de segurança (se a busca em tempo real falhar). */
-    private static volatile String[] TITULOS = {
+    /** BANCO CURADO como base (sempre toca) + descobertas ao vivo. */
+    private static volatile String[] TITULOS = BancoMusicas.titulos();
+    private static volatile String[] URLS = BancoMusicas.urls();
+
+    /* (lista antiga mantida em comentario para referencia historica)
+    private static volatile String[] TITULOS_ANTIGA = {
             "Hino da Aviação — Banda da Marinha",
             "Canção do Expedicionário (FEB) — Banda da Marinha",
             "Cisne Branco — Banda da Marinha",
@@ -55,8 +59,9 @@ public final class PlayerMusicas {
             "Hino à Bandeira — Fuzileiros Navais",
             "Hino da Independência — Fuzileiros Navais"
     };
+    */
 
-    private static volatile String[] URLS = {
+    private static volatile String[] URLS_ANTIGA = {
             "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Avia%C3%A7%C3%A3o.mp3",
             "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Can%C3%A7%C3%A3o%20Expedicion%C3%A1rio.mp3",
             "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Cisne%20Branco.mp3",
@@ -87,6 +92,10 @@ public final class PlayerMusicas {
 
     public static synchronized int total() {
         return TITULOS.length;
+    }
+
+    public static synchronized int totalBanco() {
+        return BancoMusicas.total();
     }
 
     /** A última montagem de repertório veio da busca em tempo real? */
@@ -147,7 +156,7 @@ public final class PlayerMusicas {
     // BUSCA EM TEMPO REAL
     // ------------------------------------------------------------------
 
-    /** Monta o repertório agora: pergunta ao Archive e ao Commons. */
+    /** BANCO curado na frente; descobertas da busca ao vivo entram no fim. */
     private static void buscarEmTempoReal() {
         String termo = TERMOS[contadorBuscas++ % TERMOS.length];
         ArrayList<String> titulos = new ArrayList<String>();
@@ -158,19 +167,29 @@ public final class PlayerMusicas {
         if (titulos.size() < 8) buscarNoCommons(termo, titulos, urls, usadas);
 
         if (!titulos.isEmpty()) {
-            // completa com a lista interna de segurança (sem repetir URL)
-            for (int i = 0; i < TITULOS.length; i++) {
-                if (urls.size() >= 20) break;
-                if (usadas.contains(URLS[i])) continue;
-                usadas.add(URLS[i]);
-                titulos.add(TITULOS[i]);
-                urls.add(URLS[i]);
+            // BANCO primeiro (sem repetir), depois as descobertas
+            String[] baseT = BancoMusicas.titulos();
+            String[] baseU = BancoMusicas.urls();
+            for (int i = 0; i < baseT.length; i++) usadas.add(baseU[i]);
+            ArrayList<String> finaisT = new ArrayList<String>();
+            ArrayList<String> finaisU = new ArrayList<String>();
+            for (int i = 0; i < baseT.length; i++) {
+                finaisT.add(baseT[i]);
+                finaisU.add(baseU[i]);
             }
-            TITULOS = titulos.toArray(new String[0]);
-            URLS = urls.toArray(new String[0]);
+            for (int i = 0; i < titulos.size() && finaisT.size() < BancoMusicas.total() + 8; i++) {
+                if (usadas.contains(urls.get(i))) continue;
+                usadas.add(urls.get(i));
+                finaisT.add(titulos.get(i));
+                finaisU.add(urls.get(i));
+            }
+            TITULOS = finaisT.toArray(new String[0]);
+            URLS = finaisU.toArray(new String[0]);
             buscaOk = true;
             termoUsado = termo;
         } else {
+            TITULOS = BancoMusicas.titulos();
+            URLS = BancoMusicas.urls();
             buscaOk = false;
         }
     }

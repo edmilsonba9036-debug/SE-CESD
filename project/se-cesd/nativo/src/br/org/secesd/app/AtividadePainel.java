@@ -37,10 +37,10 @@ public class AtividadePainel extends AtividadeBase {
         } else {
             textoMusica.setText("(parado)");
         }
-        dicaMusica.setText("Agora: " + PlayerMusicas.total() + " canções"
-                + (PlayerMusicas.buscaEmTempoRealOk()
-                        ? " · busca em tempo real ✓ (" + PlayerMusicas.termoBuscado() + ")"
-                        : " · lista interna (sem internet agora)")
+        int extras = PlayerMusicas.total() - PlayerMusicas.totalBanco();
+        dicaMusica.setText("Banco: " + PlayerMusicas.totalBanco() + " canções (Marinha · Exército · FAB)"
+                + (extras > 0 ? " + " + extras + " descobertas ao vivo" : "")
+                + (PlayerMusicas.buscaEmTempoRealOk() ? " ✓" : " · sem internet agora")
                 + " · toque no nome para trocar");
     }
 
@@ -176,7 +176,7 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(textoMusica, largura());
-        dicaMusica = texto("Busca EM TEMPO REAL na internet a cada toque.");
+        dicaMusica = texto("Banco das 3 Forças + descobertas ao vivo a cada toque.");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
