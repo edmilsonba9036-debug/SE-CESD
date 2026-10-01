@@ -56,8 +56,9 @@ public class AtividadeAcesso extends AtividadeBase {
         int pm = px(22);
         medalhao.setPadding(pm, px(26), pm, px(20));
 
-        SabreAladoView sabre = new SabreAladoView(this);
-        medalhao.addView(sabre, new LinearLayout.LayoutParams(px(120), px(120)));
+        android.widget.ImageView sabre = new android.widget.ImageView(this);
+        sabre.setImageResource(br.org.secesd.debug.R.drawable.sabre_prata);
+        medalhao.addView(sabre, new LinearLayout.LayoutParams(px(130), px(130)));
 
         TextView monograma = new TextView(this);
         monograma.setText("SE • CESD");
