@@ -45,14 +45,6 @@ public class AtividadePainel extends AtividadeBase {
         lpBrasao.topMargin = px(10);
         lpBrasao.gravity = android.view.Gravity.CENTER_HORIZONTAL;
         cartao.addView(brasao, lpBrasao);
-        TextView nota = new TextView(this);
-        nota.setText("Seus registros ficam só neste aparelho, criptografados com a sua senha — "
-                + "e vão ao Drive automaticamente quando você conecta o backup.");
-        nota.setTextColor(CINZA_TEXTO);
-        nota.setTextSize(13);
-        nota.setGravity(android.view.Gravity.CENTER);
-        nota.setPadding(0, px(4), 0, 0);
-        cartao.addView(nota);
         coluna.addView(cartao, largura());
 
         coluna.addView(titulo("Minha história"));
