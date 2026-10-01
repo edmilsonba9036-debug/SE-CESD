@@ -508,7 +508,7 @@ public class DriveBackup {
             String m = String.valueOf(e.getMessage());
             if (m.contains("HTTP 400") || m.contains("HTTP 401")) {
                 removerConfigBrowser();
-                throw new IOException("O Google recusou o login do navegador (ID ou segredo do cliente inválidos). Toque em “Conectar ao Drive” e use a sua conta Google.");
+                throw new IOException("O Google recusou o login do navegador (ID ou segredo do cliente inválidos). Toque em “Reparar backup automático” e use a sua conta Google.");
             }
             throw e;
         }
@@ -612,7 +612,7 @@ public class DriveBackup {
             String m = String.valueOf(e.getMessage());
             if (m.contains("HTTP 400") || m.contains("HTTP 401")) {
                 removerConfigBrowser();
-                throw new IOException("O login pelo navegador foi recusado pelo Google (ID ou segredo inválidos). Toque em “Conectar ao Drive” e use a sua conta Google.");
+                throw new IOException("O login pelo navegador foi recusado pelo Google (ID ou segredo inválidos). Toque em “Reparar backup automático” e use a sua conta Google.");
             }
             throw e;
         }

@@ -53,13 +53,6 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         });
         coluna.addView(restaurar, largura());
 
-        View conectar = botao("Conectar ao Drive", false);
-        conectar.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) { drive.conectar(); }
-        });
-        coluna.addView(conectar, largura());
-
         coluna.addView(titulo("Restaurar de um arquivo"));
         View escolherArquivo = botao("Escolher arquivo de backup…", false);
         escolherArquivo.setOnClickListener(new View.OnClickListener() {
@@ -408,7 +401,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         StringBuilder b = new StringBuilder("COMO ESTÁ O BACKUP AUTOMÁTICO\n");
         b.append("• Automático: ").append(DriveBackup.autoAtivo(this) ? "LIGADO" : "DESLIGADO").append('\n');
         String conta = p.getString("contaNome", null);
-        b.append("• Conta Google: ").append(conta == null ? "— nenhuma (toque em Conectar)" : conta).append('\n');
+        b.append("• Conta Google: ").append(conta == null ? "— nenhuma (a escolha aparece ao abrir esta tela)" : conta).append('\n');
         b.append("• Pendência de envio: ").append(p.getBoolean("pendenteEnviar", false) ? "sim (há novidades para enviar)" : "não (tudo já no Drive)").append('\n');
         b.append("• Último backup enviado: ").append(quando(p.getLong("ultimoBackup", 0))).append('\n');
         long pausa = p.getLong("autoPausaAte", 0);
