@@ -367,6 +367,7 @@ public abstract class AtividadeBase extends Activity {
             if (!p.getBoolean("pendenteEnviar", false)) return;
             long agora = System.currentTimeMillis();
             if (agora - p.getLong("tentativaAuto", 0) < 60000) return;
+            if (agora < p.getLong("autoPausaAte", 0)) return;
             DriveBackup sonda = new DriveBackup(this, null);
             if (!sonda.temSaf() && !sonda.prontoParaEnviar()) return;
             p.edit().putLong("tentativaAuto", agora).apply();

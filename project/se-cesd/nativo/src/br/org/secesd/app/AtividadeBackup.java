@@ -23,6 +23,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
     private android.widget.Button abrirCadastro;
     private TextView usuarioLinha;
     private String ultimoErro;
+    private TextView diagnostico;
     private static final int PEDIR_ARQUIVO = 4405;
 
     @Override
@@ -83,20 +84,32 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 boolean novo = !DriveBackup.autoAtivo(AtividadeBackup.this);
                 DriveBackup.definirAuto(AtividadeBackup.this, novo);
                 botaoAuto.setText(rotuloAuto());
+                atualizarDiagnostico();
                 aviso(novo ? "Backup automático ATIVADO: o app envia sozinho ao sair das telas."
                            : "Backup automático DESATIVADO: envie pelo botão quando quiser.");
             }
         });
         coluna.addView(botaoAuto, largura());
 
-        long ultimo = DriveBackup.ultimoBackup(this);
-        if (ultimo > 0) {
-            String quando = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
-                    .format(new java.util.Date(ultimo));
-            TextView su = texto("Último backup enviado: " + quando);
-            su.setTextSize(12);
-            coluna.addView(su);
-        }
+        diagnostico = new TextView(this);
+        diagnostico.setTextColor(CINZA_TEXTO);
+        diagnostico.setTextSize(12.5f);
+        diagnostico.setLineSpacing(px(2), 1f);
+        diagnostico.setPadding(0, px(10), 0, 0);
+        coluna.addView(diagnostico);
+        atualizarDiagnostico();
+
+        View reparar = botao("🔧 Reparar backup automático", false);
+        reparar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                DriveBackup.repararAuto(AtividadeBackup.this);
+                atualizarDiagnostico();
+                aviso("Reparado ✓ Confirme a janela do Google (autorização) e o backup volta a andar sozinho.");
+                drive.conectar();
+            }
+        });
+        coluna.addView(reparar, largura());
 
         status = new TextView(this);
         status.setTextColor(CINZA_TEXTO);
@@ -165,6 +178,7 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
 
         // Cria/verifica a pasta do Drive automaticamente, sem tocar em nada.
         drive.criarPastaAutomatica();
+        atualizarDiagnostico();
     }
 
     private void dialogoMudarUsuario() {
@@ -359,6 +373,34 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
                 }
             }
         }).start();
+    }
+
+    private static String quando(long t) {
+        if (t <= 0) return "nunca";
+        return new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                .format(new java.util.Date(t));
+    }
+
+    /** Mostra, em linguagem clara, por onde o backup automático está andando. */
+    private void atualizarDiagnostico() {
+        if (diagnostico == null) return;
+        android.content.SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
+        StringBuilder b = new StringBuilder("COMO ESTÁ O BACKUP AUTOMÁTICO\n");
+        b.append("• Automático: ").append(DriveBackup.autoAtivo(this) ? "LIGADO" : "DESLIGADO").append('\n');
+        String conta = p.getString("contaNome", null);
+        b.append("• Conta Google: ").append(conta == null ? "— nenhuma (toque em Conectar)" : conta).append('\n');
+        b.append("• Pendência de envio: ").append(p.getBoolean("pendenteEnviar", false) ? "sim (há novidades para enviar)" : "não (tudo já no Drive)").append('\n');
+        b.append("• Último backup enviado: ").append(quando(p.getLong("ultimoBackup", 0))).append('\n');
+        long pausa = p.getLong("autoPausaAte", 0);
+        if (System.currentTimeMillis() < pausa) {
+            b.append("• Pausado até: ").append(quando(pausa)).append(" (toque em Reparar para voltar já)\n");
+        }
+        String avisoAuto = p.getString("ultimoAviso", null);
+        if (avisoAuto != null && !avisoAuto.isEmpty()) {
+            b.append("• Último aviso do automático: ").append(avisoAuto)
+             .append(" (").append(quando(p.getLong("ultimoAvisoEm", 0))).append(')');
+        }
+        diagnostico.setText(b.toString());
     }
 
     private String rotuloAuto() {

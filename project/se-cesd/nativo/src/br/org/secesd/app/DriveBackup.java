@@ -105,6 +105,17 @@ public class DriveBackup {
         return browserConfigurado() || conta() != null;
     }
 
+    /** Repara o automático: limpa pausas, erros e o limitador; marca pendência. */
+    public static void repararAuto(Activity a) {
+        a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE).edit()
+                .putLong("autoPausaAte", 0L)
+                .putLong("tentativaAuto", 0L)
+                .putBoolean("pendenteEnviar", true)
+                .remove("ultimoAviso")
+                .remove("ultimoAvisoEm")
+                .apply();
+    }
+
     /** Data/hora do último backup bem-sucedido (0 = nunca). */
     public static long ultimoBackup(Activity a) {
         return a.getSharedPreferences("drive-backup", Activity.MODE_PRIVATE)
@@ -162,7 +173,7 @@ public class DriveBackup {
             String nome = data != null ? data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME) : null;
             if (nome == null) {
                 prefs().edit().putLong("autoPausaAte",
-                        System.currentTimeMillis() + 3L * 24 * 60 * 60 * 1000).apply();
+                        System.currentTimeMillis() + 6L * 60 * 60 * 1000).apply();
                 avisar("Nenhuma conta escolhida.", false);
             } else {
                 salvarConta(nome);
@@ -247,7 +258,13 @@ public class DriveBackup {
     }
 
     private void avisar(final String msg, final boolean ok) {
-        if (ouvinte == null) return;
+        if (ouvinte == null) {
+            // Modo automático: sem tela para avisar — registra para o painel
+            // de diagnóstico da tela Backup mostrar o motivo ao usuário.
+            prefs().edit().putString("ultimoAviso", msg)
+                    .putLong("ultimoAvisoEm", System.currentTimeMillis()).apply();
+            return;
+        }
         atividade.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -639,7 +656,7 @@ public class DriveBackup {
             resultado = futuro.getResult();
         } catch (android.accounts.OperationCanceledException e) {
             prefs().edit().putLong("autoPausaAte",
-                    System.currentTimeMillis() + 3L * 24 * 60 * 60 * 1000).apply();
+                    System.currentTimeMillis() + 6L * 60 * 60 * 1000).apply();
             throw new IOException("Você cancelou a autorização do Google.");
         } catch (android.accounts.AuthenticatorException e) {
             throw new IOException(orientarFalhaAutenticador(e));
