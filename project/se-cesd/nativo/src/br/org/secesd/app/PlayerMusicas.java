@@ -91,6 +91,11 @@ public final class PlayerMusicas {
         return TITULOS[indice % TITULOS.length];
     }
 
+    /** URL da canção atual (para o botão de baixar). */
+    public static synchronized String urlAtual() {
+        return URLS[indice % URLS.length];
+    }
+
     public static synchronized int total() {
         return TITULOS.length;
     }
@@ -299,6 +304,27 @@ public final class PlayerMusicas {
     private static String resumir(String s) {
         if (s.length() > 58) return s.substring(0, 58) + "…";
         return s;
+    }
+
+    /** Baixa binária (para salvar a canção no Drive). Só 2xx devolve bytes. */
+    public static byte[] baixarBytes(String url, int tempoConexao, int tempoLeitura) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        c.setConnectTimeout(tempoConexao);
+        c.setReadTimeout(tempoLeitura);
+        c.setRequestProperty("Accept", "audio/*;q=0.9,*/*;q=0.5");
+        int codigo = c.getResponseCode();
+        if (codigo < 200 || codigo >= 300) {
+            c.disconnect();
+            throw new Exception("HTTP " + codigo);
+        }
+        InputStream f = c.getInputStream();
+        ByteArrayOutputStream saida = new ByteArrayOutputStream();
+        byte[] p = new byte[8192];
+        int n;
+        while ((n = f.read(p)) != -1) saida.write(p, 0, n);
+        f.close();
+        c.disconnect();
+        return saida.toByteArray();
     }
 
     private static String baixar(String url, int tempoConexao, int tempoLeitura) throws Exception {

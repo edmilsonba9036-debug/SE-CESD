@@ -21,6 +21,7 @@ public class AtividadePainel extends AtividadeBase {
     private android.widget.Button botaoMusica;
     private TextView textoMusica;
     private TextView dicaMusica;
+    private android.widget.Button botaoBaixarMusica;
     private final android.os.Handler relogioMusica = new android.os.Handler();
 
 
@@ -176,6 +177,14 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(textoMusica, largura());
+        botaoBaixarMusica = botao("⬇  Baixar esta canção no Drive", false);
+        botaoBaixarMusica.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                baixarMusicaNoDrive();
+            }
+        });
+        cartaoMusica.addView(botaoBaixarMusica, largura());
         dicaMusica = texto("Banco das 3 Forças + descobertas ao vivo a cada toque.");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
@@ -292,6 +301,69 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         coluna.addView(cartao, largura());
+    }
+
+    private void baixarMusicaNoDrive() {
+        final String titulo = PlayerMusicas.tituloAtual();
+        final String url = PlayerMusicas.urlAtual();
+        if (url == null || titulo == null || titulo.isEmpty()) {
+            android.widget.Toast.makeText(this,
+                    "Toque ▶ e deixe uma canção tocar antes de baixar.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Baixar no Drive?")
+                .setMessage("“" + titulo + "” vai para a pasta Canções Militares "
+                        + "no seu Google Drive (a mesma conta do backup).")
+                .setPositiveButton("Baixar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        botaoBaixarMusica.setEnabled(false);
+                        botaoBaixarMusica.setText("⬇  Baixando…");
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                String fim;
+                                try {
+                                    byte[] bytes = PlayerMusicas.baixarBytes(url, 15000, 60000);
+                                    if (bytes == null || bytes.length < 1000) {
+                                        fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";
+                                    } else {
+                                        String mime = url.toLowerCase().contains(".ogg")
+                                                ? "audio/ogg" : "audio/mpeg";
+                                        fim = DriveBackup.enviarMusica(AtividadePainel.this,
+                                                nomeArquivoSeguro(titulo, url), bytes, mime);
+                                    }
+                                } catch (Exception e) {
+                                    fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";
+                                }
+                                final String msg = fim;
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        botaoBaixarMusica.setEnabled(true);
+                                        botaoBaixarMusica.setText("⬇  Baixar esta canção no Drive");
+                                        android.widget.Toast.makeText(AtividadePainel.this,
+                                                msg == null
+                                                        ? "✓ Enviada! Veja a pasta Canções Militares no seu Drive."
+                                                        : msg,
+                                                android.widget.Toast.LENGTH_LONG).show();
+                                    }
+                                });
+                            }
+                        }).start();
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private static String nomeArquivoSeguro(String titulo, String url) {
+        String t = titulo.replace(" — ", " - ").trim();
+        t = t.replaceAll("[\\/:*?\"<>|]", "").trim();
+        if (t.length() > 70) t = t.substring(0, 70).trim();
+        return t + (url.toLowerCase().contains(".ogg") ? ".ogg" : ".mp3");
     }
 
     private void confirmarApagar() {
