@@ -1070,10 +1070,17 @@ public class DriveBackup {
 
     private String garantirPasta(String t) throws Exception {
         String id = localizarPasta(t);
-        if (id != null) return id;
+        if (id != null) {
+            moverParaCESD(t, id);
+            return id;
+        }
+        String raiz = garantirPastaCESD(t);
         JSONObject meta = new JSONObject();
         meta.put("name", nomePastaAtual());
         meta.put("mimeType", "application/vnd.google-apps.folder");
+        org.json.JSONArray paisRaiz = new org.json.JSONArray();
+        paisRaiz.put(raiz);
+        meta.put("parents", paisRaiz);
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
@@ -1239,10 +1246,17 @@ public class DriveBackup {
     private String garantirPastaMusicas(String t) throws Exception {
         String q = "name='" + PASTA_CANC + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
         String id = primeiro(buscar(t, q));
-        if (id != null) return id;
+        if (id != null) {
+            moverParaCESD(t, id);
+            return id;
+        }
+        String raiz = garantirPastaCESD(t);
         JSONObject meta = new JSONObject();
         meta.put("name", PASTA_CANC);
         meta.put("mimeType", "application/vnd.google-apps.folder");
+        org.json.JSONArray paisMusicas = new org.json.JSONArray();
+        paisMusicas.put(raiz);
+        meta.put("parents", paisMusicas);
         HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
         escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
@@ -1251,6 +1265,53 @@ public class DriveBackup {
         conn.disconnect();
         if (codigo < 200 || codigo >= 300) throw new IOException("HTTP " + codigo + " ao criar a pasta no Drive.");
         return new JSONObject(corpo).getString("id");
+    }
+
+    /** Pasta-mãe "CESD" no Drive (cria se não existir). Backup e canções ficam dentro dela. */
+    private String garantirPastaCESD(String t) throws Exception {
+        String q = "name='CESD' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+        String id = primeiro(buscar(t, q));
+        if (id != null) return id;
+        JSONObject meta = new JSONObject();
+        meta.put("name", "CESD");
+        meta.put("mimeType", "application/vnd.google-apps.folder");
+        HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
+        int codigo = conn.getResponseCode();
+        String corpo = ler(conn, codigo);
+        conn.disconnect();
+        if (codigo < 200 || codigo >= 300) throw new IOException("HTTP " + codigo + " ao criar a pasta CESD.");
+        return new JSONObject(corpo).getString("id");
+    }
+
+    /**
+     * Organiza uma pasta já existente para dentro de CESD (sem copiar nada,
+     * só muda o endereço). Se algo falhar, segue o jogo: a pasta continua
+     * funcionando onde estiver.
+     */
+    private void moverParaCESD(String t, String pastaId) {
+        try {
+            String raiz = garantirPastaCESD(t);
+            HttpURLConnection g = abrir(API + "files/" + pastaId + "?fields=parents", t, "GET");
+            int cg = g.getResponseCode();
+            String corpoG = ler(g, cg);
+            g.disconnect();
+            if (cg < 200 || cg >= 300) return;
+            org.json.JSONArray atuais = new JSONObject(corpoG).optJSONArray("parents");
+            if (atuais == null || atuais.length() != 1) return; // já organizada ou caso raro: não mexe
+            String atual = atuais.optString(0, "");
+            if (atual.isEmpty() || raiz.equals(atual)) return; // já está dentro de CESD
+            String url = API + "files/" + pastaId + "?addParents=" + raiz
+                    + "&removeParents=" + URLEncoder.encode(atual, "UTF-8") + "&fields=id";
+            HttpURLConnection conn = abrir(url, t, "PATCH");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            escrever(conn, "{}".getBytes(StandardCharsets.UTF_8));
+            ler(conn, conn.getResponseCode());
+            conn.disconnect();
+        } catch (Exception e) {
+            // Organizar é cortesia, não obrigação: o backup/canções seguem funcionando.
+        }
     }
 
     private String localizarMusica(String t, String pastaId, String nomeArquivo) throws Exception {
