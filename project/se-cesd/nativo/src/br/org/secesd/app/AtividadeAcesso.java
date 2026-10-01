@@ -23,8 +23,72 @@ public class AtividadeAcesso extends AtividadeBase {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        instalarCapturadorDeErros();
         criando = !Cofre.existe(this);
         montar();
+    }
+
+    /** Se algo derrubar o app, mostra o erro na tela com botao para copiar. */
+    private void instalarCapturadorDeErros() {
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(final Thread t, final Throwable e) {
+                try {
+                    java.io.StringWriter sw = new java.io.StringWriter();
+                    e.printStackTrace(new java.io.PrintWriter(sw));
+                    final String texto = "Erro: " + e.getClass().getName() + "\n\n" + sw.toString();
+                    try {
+                        java.io.FileOutputStream f = openFileOutput("erro-ultimo.txt", android.content.Context.MODE_PRIVATE);
+                        f.write(texto.getBytes("UTF-8"));
+                        f.close();
+                    } catch (Exception ignorado) {
+                    }
+                    final String msg = texto.length() > 1200 ? texto.substring(0, 1200) + "…" : texto;
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                android.os.Looper.prepare();
+                                TextView tx = new TextView(AtividadeAcesso.this);
+                                tx.setText(msg);
+                                tx.setTextSize(11);
+                                tx.setPadding(px(16), px(8), px(16), px(8));
+                                android.widget.ScrollView sc = new android.widget.ScrollView(AtividadeAcesso.this);
+                                sc.addView(tx);
+                                new android.app.AlertDialog.Builder(AtividadeAcesso.this)
+                                        .setTitle("Ocorreu um erro")
+                                        .setView(sc)
+                                        .setPositiveButton("📋 Copiar o erro",
+                                                new android.content.DialogInterface.OnClickListener() {
+                                                    @Override
+                                                    public void onClick(android.content.DialogInterface d, int w) {
+                                                        android.content.ClipboardManager cm =
+                                                                (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                                                        if (cm != null) {
+                                                            cm.setPrimaryClip(android.content.ClipData.newPlainText("erro", texto));
+                                                        }
+                                                        android.os.Process.killProcess(android.os.Process.myPid());
+                                                    }
+                                                })
+                                        .setNegativeButton("Fechar",
+                                                new android.content.DialogInterface.OnClickListener() {
+                                                    @Override
+                                                    public void onClick(android.content.DialogInterface d, int w) {
+                                                        android.os.Process.killProcess(android.os.Process.myPid());
+                                                    }
+                                                })
+                                        .show();
+                                android.os.Looper.loop();
+                            } catch (Exception falha) {
+                                android.os.Process.killProcess(android.os.Process.myPid());
+                            }
+                        }
+                    }).start();
+                } catch (Exception falha) {
+                    android.os.Process.killProcess(android.os.Process.myPid());
+                }
+            }
+        });
     }
 
     @Override
@@ -121,29 +185,29 @@ public class AtividadeAcesso extends AtividadeBase {
             coluna.addView(btnDigital, largura());
 
             TextView dicaDigital = new TextView(this);
-            dicaDigital.setText(Digital.habilitada(this)
-                    ? "Digital ativa ✓ — a próxima entrada pode ser só com o dedo."
-                    : "Primeiro uso: toque acima e confirme com sua senha e sua digital.");
+            dicaDigital.setText("Primeiro uso: toque acima, confirme com sua senha e encoste o dedo. Depois, só o dedo abre.");
             dicaDigital.setTextColor(CINZA_TEXTO);
             dicaDigital.setTextSize(12);
             dicaDigital.setPadding(0, px(8), 0, 0);
             coluna.addView(dicaDigital);
 
-            if (Digital.habilitada(this)) {
-                TextView desligar = new TextView(this);
-                desligar.setText("Desabilitar entrada pela digital");
-                desligar.setTextColor(AZUL_MEDIO);
-                desligar.setTextSize(13);
-                desligar.setTypeface(Typeface.DEFAULT_BOLD);
-                desligar.setPadding(0, px(6), 0, 0);
-                desligar.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        confirmarDesabilitar();
+            TextView desligar = new TextView(this);
+            desligar.setText("Desabilitar entrada pela digital");
+            desligar.setTextColor(AZUL_MEDIO);
+            desligar.setTextSize(13);
+            desligar.setTypeface(Typeface.DEFAULT_BOLD);
+            desligar.setPadding(0, px(6), 0, 0);
+            desligar.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (!Digital.habilitada(AtividadeAcesso.this)) {
+                        aviso("A entrada pela digital ainda não está habilitada.");
+                        return;
                     }
-                });
-                coluna.addView(desligar);
-            }
+                    confirmarDesabilitar();
+                }
+            });
+            coluna.addView(desligar);
 
             TextView nota = new TextView(this);
             String usuario = Cofre.usuarioGravado(this);
