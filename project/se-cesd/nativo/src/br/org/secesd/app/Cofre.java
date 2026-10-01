@@ -121,6 +121,25 @@ public final class Cofre {
         return chaveSessao != null;
     }
 
+    /** Confere a senha SEM abrir a sessão (usado para habilitar a entrada pela digital). */
+    public static String verificarSenha(Context ctx, String usuario, String senha) {
+        try {
+            JSONObject c = lerBruto(ctx);
+            if (c == null) return "Nenhum acesso criado neste aparelho.";
+            if (!c.optString("usuario", "").equals(usuario == null ? "" : usuario.trim())) {
+                return "Senha incorreta.";
+            }
+            byte[] sal = Base64.decode(c.getString("sal"), Base64.NO_WRAP);
+            SecretKey chave = chave(senha.toCharArray(), sal);
+            byte[] ivVerif = Base64.decode(c.getString("ivVerif"), Base64.NO_WRAP);
+            byte[] verif = Base64.decode(c.getString("verif"), Base64.NO_WRAP);
+            if (!MARCA_VERIFICADOR.equals(decifrar(chave, ivVerif, verif))) return "Senha incorreta.";
+            return null;
+        } catch (Exception e) {
+            return "Senha incorreta.";
+        }
+    }
+
     public static void bloquear() {
         chaveSessao = null;
         usuarioSessao = null;
