@@ -17,6 +17,44 @@ import android.widget.TextView;
  */
 public class AtividadePainel extends AtividadeBase {
 
+    private View farol;
+
+    /** Verde: automatico LIGADO + conta conectada + sem pausa. Vermelho: o contrario. */
+    private int corFarol() {
+        return farolSaudavel() ? 0xFF2E9E5B : 0xFFC0392B;
+    }
+
+    private boolean farolSaudavel() {
+        android.content.SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
+        return DriveBackup.autoAtivo(this)
+                && p.getString("contaNome", null) != null
+                && System.currentTimeMillis() >= p.getLong("autoPausaAte", 0);
+    }
+
+    private String textoFarol() {
+        if (farolSaudavel()) return "Backup automático funcionando ✓";
+        android.content.SharedPreferences p = getSharedPreferences("drive-backup", MODE_PRIVATE);
+        if (!DriveBackup.autoAtivo(this)) return "Backup automático desligado — ligue na tela Backup.";
+        if (p.getString("contaNome", null) == null) return "Backup sem conta Google — conecte na tela Backup.";
+        return "Backup pausado — toque em Reparar na tela Backup.";
+    }
+
+    private void recolorirFarol() {
+        if (farol == null) return;
+        android.graphics.drawable.GradientDrawable bolinha =
+                new android.graphics.drawable.GradientDrawable();
+        bolinha.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bolinha.setColor(corFarol());
+        bolinha.setStroke(px(2), 0xFFFFFFFF);
+        farol.setBackground(bolinha);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        recolorirFarol();
+    }
+
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -106,7 +144,31 @@ public class AtividadePainel extends AtividadeBase {
         rodape.setPadding(0, px(20), 0, 0);
         coluna.addView(rodape);
 
-        setContentView(rolagem);
+        // FAROL do backup automatico: bolinha no canto — verde = funcionando,
+        // vermelho = parado. Sem texto; toque curto diz o motivo.
+        android.widget.FrameLayout raiz = new android.widget.FrameLayout(this);
+        raiz.addView(rolagem, new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        farol = new View(this);
+        android.graphics.drawable.GradientDrawable bolinha =
+                new android.graphics.drawable.GradientDrawable();
+        bolinha.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        bolinha.setColor(corFarol());
+        bolinha.setStroke(px(2), 0xFFFFFFFF);
+        farol.setBackground(bolinha);
+        farol.setElevation(px(6));
+        farol.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                aviso(textoFarol());
+            }
+        });
+        android.widget.FrameLayout.LayoutParams lpFarol = new android.widget.FrameLayout.LayoutParams(
+                px(22), px(22), android.view.Gravity.TOP | android.view.Gravity.END);
+        lpFarol.topMargin = px(14);
+        lpFarol.rightMargin = px(14);
+        raiz.addView(farol, lpFarol);
+        setContentView(raiz);
     }
 
     private void menu(LinearLayout coluna, String monograma, int cor,
