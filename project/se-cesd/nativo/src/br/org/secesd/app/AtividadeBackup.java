@@ -100,6 +100,8 @@ public class AtividadeBackup extends AtividadeBase implements DriveBackup.Ouvint
         atualizarDiagnostico();
 
         View reparar = botao("🔧 Reparar backup automático", false);
+        reparar.setBackground(arredondado(0xFFFFF3C4, px(16), 0xFFC9A227, px(1)));
+        reparar.setTextColor(AZUL_MARINHA);
         reparar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
