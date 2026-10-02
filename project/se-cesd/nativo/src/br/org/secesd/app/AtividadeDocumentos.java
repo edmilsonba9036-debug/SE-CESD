@@ -61,6 +61,7 @@ public class AtividadeDocumentos extends AtividadeBase {
             JSONObject dados = Cofre.lerDados(this);
             dados.put("documentos", documentos);
             Cofre.salvarDados(this, dados);
+            agendarBackup();
         } catch (Exception e) {
             aviso("Não foi possível salvar: " + e.getMessage());
         }

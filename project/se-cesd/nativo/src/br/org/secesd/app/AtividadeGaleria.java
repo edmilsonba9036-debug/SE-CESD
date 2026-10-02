@@ -321,6 +321,7 @@ public class AtividadeGaleria extends AtividadeBase {
             org.json.JSONObject dados = Cofre.lerDados(this);
             dados.put("galeria", galeria);
             Cofre.salvarDados(this, dados);
+            agendarBackup();
         } catch (Exception e) {
             aviso("Não foi possível salvar: " + e.getMessage());
         }

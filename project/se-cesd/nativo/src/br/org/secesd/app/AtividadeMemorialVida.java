@@ -98,6 +98,7 @@ public class AtividadeMemorialVida extends AtividadeBase {
             JSONObject dados = Cofre.lerDados(this);
             dados.put("memorial", memorial);
             Cofre.salvarDados(this, dados);
+            agendarBackup();
         } catch (Exception e) {
             aviso("Não foi possível salvar: " + e.getMessage());
         }

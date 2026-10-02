@@ -350,8 +350,95 @@ public abstract class AtividadeBase extends Activity {
 
     @Override
     protected void onStop() {
+        autoHandler.removeCallbacks(autoSalva);
+        if (mudou) {
+            mudou = false;
+            try { salvarConteudo(); } catch (Exception e) { }
+        }
         super.onStop();
         tentarBackupAutomatico();
+    }
+
+    @Override
+    protected void onDestroy() {
+        autoHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
+    }
+
+    // ------------------------------------------------------------------
+    // SALVAMENTO AUTOMÁTICO — cada campo se salva sozinho e o backup
+    // automático sai ~20 segundos depois da última mudança.
+    // ------------------------------------------------------------------
+
+    private boolean mudou = false;
+    private boolean populando = false;
+    private long ultimoAvisoSalvo = 0;
+    private final android.os.Handler autoHandler = new android.os.Handler();
+
+    /** Liga um campo de texto ao salvamento automático. */
+    protected android.text.TextWatcher vigia() {
+        return new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) { }
+            @Override public void afterTextChanged(android.text.Editable s) {
+                if (populando) return;
+                marcarMudanca();
+            }
+        };
+    }
+
+    /** Use true enquanto o código preenche a tela (não é mudança do usuário). */
+    protected void populando(boolean v) {
+        populando = v;
+        if (v) {
+            autoHandler.removeCallbacks(autoSalva);
+            mudou = false;
+        }
+    }
+
+    protected void marcarMudanca() {
+        mudou = true;
+        autoHandler.removeCallbacks(autoSalva);
+        autoHandler.postDelayed(autoSalva, 1200);
+    }
+
+    private final Runnable autoSalva = new Runnable() {
+        @Override
+        public void run() {
+            if (!mudou) return;
+            try {
+                salvarConteudo();
+                mudou = false;
+                avisoSalvo();
+                agendarBackup();
+            } catch (Exception e) {
+                // ficou pendente; o onStop tenta de novo
+            }
+        }
+    };
+
+    private final Runnable backupAtrasado = new Runnable() {
+        @Override
+        public void run() {
+            tentarBackupAutomatico();
+        }
+    };
+
+    /** Cada tela com campos grava aqui (sem mensagens na tela). */
+    protected void salvarConteudo() { }
+
+    /** Backup automático discreto ~20 s depois da última mudança. */
+    protected void agendarBackup() {
+        autoHandler.removeCallbacks(backupAtrasado);
+        autoHandler.postDelayed(backupAtrasado, 20000);
+    }
+
+    private void avisoSalvo() {
+        long agora = System.currentTimeMillis();
+        if (agora - ultimoAvisoSalvo < 8000) return;
+        ultimoAvisoSalvo = agora;
+        android.widget.Toast.makeText(this,
+                "✓ Salvo automaticamente", android.widget.Toast.LENGTH_SHORT).show();
     }
 
     /**

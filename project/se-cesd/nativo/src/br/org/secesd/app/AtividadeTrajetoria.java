@@ -248,6 +248,7 @@ public class AtividadeTrajetoria extends AtividadeBase {
             org.json.JSONObject dados = Cofre.lerDados(this);
             dados.put("trajetoria", etapas);
             Cofre.salvarDados(this, dados);
+            agendarBackup();
         } catch (Exception e) {
             aviso("Não foi possível salvar: " + e.getMessage());
             return;

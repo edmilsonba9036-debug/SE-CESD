@@ -77,6 +77,10 @@ public class AtividadeCadastro extends AtividadeBase {
         nomeGuerra = campo("Nome de guerra");
         especialidade = campo("Especialidade (ex.: Segurança e Defesa)");
         om = campo("Organização Militar (ex.: Ala 13 — Guarulhos / SP)");
+        nomeCompleto.addTextChangedListener(vigia());
+        nomeGuerra.addTextChangedListener(vigia());
+        especialidade.addTextChangedListener(vigia());
+        om.addTextChangedListener(vigia());
         coluna.addView(nomeCompleto, largura());
         coluna.addView(nomeGuerra, largura());
         coluna.addView(especialidade, largura());
@@ -86,7 +90,7 @@ public class AtividadeCadastro extends AtividadeBase {
         salvar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                salvar();
+                salvar(false);
             }
         });
         coluna.addView(salvar, largura());
@@ -106,6 +110,7 @@ public class AtividadeCadastro extends AtividadeBase {
     }
 
     private void carregar() {
+        populando(true);
         try {
             org.json.JSONObject c = Cofre.lerDados(this).optJSONObject("cadastro");
             if (c == null) return;
@@ -121,16 +126,17 @@ public class AtividadeCadastro extends AtividadeBase {
         } catch (Exception e) {
             aviso("Não foi possível ler o cadastro: " + e.getMessage());
         }
+        populando(false);
     }
 
-    private void salvar() {
+    private void salvar(boolean silencioso) {
         String nome = nomeCompleto.getText().toString().trim();
         if (nome.length() < 3) {
-            aviso("Informe seu nome completo.");
+            if (!silencioso) aviso("Informe seu nome completo.");
             return;
         }
         if (especialidade.getText().toString().trim().isEmpty()) {
-            aviso("Informe sua especialidade.");
+            if (!silencioso) aviso("Informe sua especialidade.");
             return;
         }
         try {
@@ -143,10 +149,15 @@ public class AtividadeCadastro extends AtividadeBase {
             c.put("foto", fotoBase64 == null ? "" : fotoBase64);
             dados.put("cadastro", c);
             Cofre.salvarDados(this, dados);
-            aviso("Cadastro salvo ✓ criptografado neste aparelho.");
+            if (!silencioso) aviso("Cadastro salvo ✓ criptografado neste aparelho.");
         } catch (Exception e) {
             aviso("Não foi possível salvar: " + e.getMessage());
         }
+    }
+
+    @Override
+    protected void salvarConteudo() {
+        salvar(true);
     }
 
     private void escolherFoto() {
