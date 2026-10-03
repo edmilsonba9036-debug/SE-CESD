@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'br.org.secesd'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId 'br.org.secesd'
+        minSdk 26
+        targetSdk 33
+        versionCode 2
+        versionName '1.1'
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+        release {
+            // This is a sideload/test build. It is signed with Gradle's debug key; do not publish it to Play Store.
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    // Nenhuma dependência externa: a autorização do Drive usa o framework
+    // AccountManager/AccountPicker (o consentimento é do Play Services do
+    // aparelho, sem biblioteca gms e sem fluxo de navegador).
+}
