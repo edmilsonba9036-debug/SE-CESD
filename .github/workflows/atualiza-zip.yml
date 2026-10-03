@@ -81,31 +81,33 @@ jobs:
                   classes.append((n, desc.get(n, 'classe do aplicativo')))
           lista = '\n'.join('  %s ....... %s' % (n, d) for n, d in classes)
 
-          leiame = """================================================================
-SE • CESD — CÓDIGO-FONTE DO APLICATIVO NATIVO (Android)
-Versão {v}
-================================================================
-
-ATENÇÃO: este zip é ATUALIZADO AUTOMATICAMENTE pelo robô do GitHub
-(Ações) toda vez que o aplicativo muda. O arquivo aqui é sempre a
-versão mais nova. Publicado em {q} (alteração {s}).
-
-COMO O PROJETO ESTÁ ORGANIZADO
-  AndroidManifest.xml ....... a identidade do app (nome, ícone,
-                              telas, permissões: internet, biometria)
-  res/ ..................... ícones (brasão CESD)
-  src/br/org/secesd/app/ ... as classes Java (o coração do app)
-
-AS CLASSES (para orientar a leitura)
-{c}
-
-PARA COMPILAR
-  Recursos com aapt2, javac 8, d8, empacotamento e assinatura.
-  O APK pronto está em project/se-cesd/SE-CESD-nativo-v1.1.apk
-  (sempre a versão mais nova, mesmo nome de arquivo).
-
-Repositório: github.com/edmilsonba9036-debug/SE-CESD
-""".format(v=versao, q=quando, s=sha, c=lista)
+          linhas = [
+              '================================================================',
+              'SE • CESD — CÓDIGO-FONTE DO APLICATIVO NATIVO (Android)',
+              'Versão ' + versao,
+              '================================================================',
+              '',
+              'ATENÇÃO: este zip é ATUALIZADO AUTOMATICAMENTE pelo robô do GitHub',
+              '(Ações) toda vez que o aplicativo muda. O arquivo aqui é sempre a',
+              'versão mais nova. Publicado em ' + quando + ' (alteração ' + sha + ').',
+              '',
+              'COMO O PROJETO ESTÁ ORGANIZADO',
+              '  AndroidManifest.xml ....... a identidade do app (nome, ícone,',
+              '                              telas, permissões: internet, biometria)',
+              '  res/ ..................... ícones (brasão CESD)',
+              '  src/br/org/secesd/app/ ... as classes Java (o coração do app)',
+              '',
+              'AS CLASSES (para orientar a leitura)',
+              lista,
+              '',
+              'PARA COMPILAR',
+              '  Recursos com aapt2, javac 8, d8, empacotamento e assinatura.',
+              '  O APK pronto está em project/se-cesd/SE-CESD-nativo-v1.1.apk',
+              '  (sempre a versão mais nova, mesmo nome de arquivo).',
+              '',
+              'Repositório: github.com/edmilsonba9036-debug/SE-CESD',
+          ]
+          leiame = '\n'.join(linhas) + '\n'
 
           arquivos = []
           for pasta, _, nomes in os.walk(raiz):
