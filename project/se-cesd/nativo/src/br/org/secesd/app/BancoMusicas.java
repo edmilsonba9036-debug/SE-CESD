@@ -8,6 +8,7 @@ package br.org.secesd.app;
  * da AFA/FAB (www2.fab.mil.br/afa — quadro completo de canções),
  * Internet Archive (Fuzileiros Navais), Wikimedia Commons (domínio
  * público) e cópias preservadas do Colégio Militar de Brasília.
+ * Curadoria revisada em 02/10/2026.
  */
 public final class BancoMusicas {
 
