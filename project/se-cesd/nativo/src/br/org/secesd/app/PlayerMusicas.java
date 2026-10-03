@@ -1,5 +1,12 @@
 package br.org.secesd.app;
 
+/**
+ * PLAYER de canções militares (estático, sem tela própria).
+ * Histórico: v1.10.0 nasceu com 7 faixas; v1.10.2 busca em tempo real
+ * (Archive + Commons); v1.10.3 banco curado na frente das descobertas;
+ * v1.10.6 escolher faixa (tocarIndice); v1.10.11 integra ao
+ * salvamento/backup automático.
+ */
 import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
