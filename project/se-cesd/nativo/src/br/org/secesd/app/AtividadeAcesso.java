@@ -101,6 +101,9 @@ public class AtividadeAcesso extends AtividadeBase {
         }
     }
 
+    /** Garante que o leitor seja acionado sozinho uma única vez por abertura. */
+    private boolean digitalAutoOferecida = false;
+
     private void montar() {
         String titulo = criando ? "Criar acesso" : "Entrar";
         String subtitulo = criando
@@ -175,21 +178,15 @@ public class AtividadeAcesso extends AtividadeBase {
         coluna.addView(entrar, largura());
 
         if (!criando) {
-            View btnDigital = botao("👆  Entrar com a digital", false);
-            btnDigital.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    entradaDigital();
-                }
-            });
-            coluna.addView(btnDigital, largura());
-
-            TextView dicaDigital = new TextView(this);
-            dicaDigital.setText("Primeiro uso: toque acima, confirme com sua senha e encoste o dedo. Depois, só o dedo abre.");
-            dicaDigital.setTextColor(CINZA_TEXTO);
-            dicaDigital.setTextSize(12);
-            dicaDigital.setPadding(0, px(8), 0, 0);
-            coluna.addView(dicaDigital);
+            if (Digital.habilitada(this)) {
+                TextView notaBio = new TextView(this);
+                notaBio.setText("A biometria é o acesso principal: ao abrir, o app pede "
+                        + "sua digital sozinho (nem botão precisa).");
+                notaBio.setTextColor(CINZA_TEXTO);
+                notaBio.setTextSize(12);
+                notaBio.setPadding(0, px(8), 0, 0);
+                coluna.addView(notaBio);
+            }
 
             TextView desligar = new TextView(this);
             desligar.setText("Desabilitar entrada pela digital");
@@ -218,26 +215,29 @@ public class AtividadeAcesso extends AtividadeBase {
             coluna.addView(nota);
         }
         setContentView(rolagem);
+        // BIOMETRIA AUTOMÁTICA: a leitura dispara sozinha, sem botão.
+        if (!criando) {
+            new android.os.Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    oferecerDigitalAutomatica();
+                }
+            }, 350);
+        }
     }
 
     // ------------------------------------------------------------------
-    // Entrada pela digital
+    // Entrada pela digital (acionamento automático — sem botão)
     // ------------------------------------------------------------------
 
-    private void entradaDigital() {
-        if (!Digital.leitorPresente(this)) {
-            aviso("Este aparelho não tem leitor de digital.");
-            return;
-        }
-        if (!Digital.digitalCadastrada(this)) {
-            aviso("Nenhuma digital cadastrada no aparelho. Cadastre em: Configurações › Segurança › Digital (impressão digital).");
-            return;
-        }
-        if (Digital.habilitada(this)) {
-            abrirPorDigital();
-        } else {
-            pedirSenhaParaHabilitar();
-        }
+    /** Se a biometria está habilitada, pede o dedo sozinho ao abrir a tela. */
+    private void oferecerDigitalAutomatica() {
+        if (digitalAutoOferecida) return;
+        digitalAutoOferecida = true;
+        if (!Digital.habilitada(this)) return;
+        if (!Digital.leitorPresente(this)) return;
+        if (!Digital.digitalCadastrada(this)) return;
+        abrirPorDigital();
     }
 
     /** Entrada direta: prepara a decifragem e pede a digital. */
@@ -250,41 +250,6 @@ public class AtividadeAcesso extends AtividadeBase {
             montar();
             aviso("As digitais do aparelho mudaram desde a habilitação. Habilite a digital de novo, com sua senha.");
         }
-    }
-
-    /** Habilitação: prova a senha SEM abrir a sessão e então confirma a digital. */
-    private void pedirSenhaParaHabilitar() {
-        final EditText campoConf = campo("Sua senha de acesso");
-        android.widget.FrameLayout moldura = new android.widget.FrameLayout(this);
-        int p = px(20);
-        moldura.setPadding(p, px(6), p, 0);
-        moldura.addView(campoConf, new android.widget.FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Habilitar entrada pela digital")
-                .setMessage("Para ativar, confirme sua senha de acesso. Depois, encoste o dedo no leitor.")
-                .setView(moldura)
-                .setPositiveButton("Continuar", new android.content.DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(android.content.DialogInterface d, int qual) {
-                        String usuario = Cofre.usuarioGravado(AtividadeAcesso.this);
-                        String senha = campoConf.getText().toString();
-                        String erro = Cofre.verificarSenha(AtividadeAcesso.this, usuario, senha);
-                        if (erro != null) {
-                            aviso(erro);
-                            return;
-                        }
-                        try {
-                            javax.crypto.Cipher c = Digital.cifradorHabilitar();
-                            autenticar(c, true, usuario, senha);
-                        } catch (Exception e) {
-                            aviso("Não foi possível preparar a digital: " + e.getMessage());
-                        }
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
     }
 
     private void confirmarDesabilitar() {
@@ -306,6 +271,12 @@ public class AtividadeAcesso extends AtividadeBase {
     /** Pede a digital ao Android (BiometricPrompt no Android 9+, FingerprintManager antes). */
     private void autenticar(final javax.crypto.Cipher cifra, final boolean habilitando,
                             final String usuarioHab, final String senhaHab) {
+        autenticar(cifra, habilitando, usuarioHab, senhaHab, null);
+    }
+
+    private void autenticar(final javax.crypto.Cipher cifra, final boolean habilitando,
+                            final String usuarioHab, final String senhaHab,
+                            final Runnable aoCancelar) {
         final android.os.CancellationSignal sinal = new android.os.CancellationSignal();
         final java.util.concurrent.Executor exec = new java.util.concurrent.Executor() {
             private final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -328,6 +299,7 @@ public class AtividadeAcesso extends AtividadeBase {
                                     new android.content.DialogInterface.OnClickListener() {
                                         @Override
                                         public void onClick(android.content.DialogInterface d, int qual) {
+                                            if (aoCancelar != null) aoCancelar.run();
                                         }
                                     })
                             .build();
@@ -449,6 +421,25 @@ public class AtividadeAcesso extends AtividadeBase {
             if (erro != null) {
                 aviso(erro);
                 return;
+            }
+            // AUTOMAÇÃO DA BIOMETRIA: com a senha provada, se o leitor
+            // ainda não é a porta principal, habilita agora — é só
+            // encostar o dedo uma vez. Cancelou? Entra do mesmo jeito.
+            if (!Digital.habilitada(this) && Digital.leitorPresente(this)
+                    && Digital.digitalCadastrada(this)) {
+                try {
+                    javax.crypto.Cipher c = Digital.cifradorHabilitar();
+                    autenticar(c, true, usuario, senha, new Runnable() {
+                        @Override
+                        public void run() {
+                            ir(AtividadePainel.class);
+                            finish();
+                        }
+                    });
+                    return;
+                } catch (Exception ign) {
+                    // sem preparo para a digital agora: segue por senha
+                }
             }
             ir(AtividadePainel.class);
             finish();
