@@ -40,7 +40,9 @@ public final class PlayerMusicas {
             "dobrado militar banda",
             "hino marinha exercito aeronautica",
             "canção militar brasileira",
-            "ardor do infante"
+            "ardor do infante",
+            "dobrado brasileiro banda",
+            "feb canção do expedicionário"
     };
 
     /** Palavras-chave que confirmam que o resultado é mesmo canção militar. */
@@ -56,6 +58,7 @@ public final class PlayerMusicas {
     /** BANCO CURADO como base (sempre toca) + descobertas ao vivo. */
     private static volatile String[] TITULOS = BancoMusicas.titulos();
     private static volatile String[] URLS = BancoMusicas.urls();
+    private static volatile String[] FALLBACKS = BancoMusicas.fallbacks();
 
     /* (lista antiga mantida em comentario para referencia historica)
     private static volatile String[] TITULOS_ANTIGA = {
@@ -116,6 +119,12 @@ public final class PlayerMusicas {
     /** URL da canção na posição i do repertório. */
     public static synchronized String urlEm(int i) {
         return URLS[i % URLS.length];
+    }
+
+    /** Espelho (fonte reserva) da canção na posição i. */
+    public static synchronized String urlFallbackEm(int i) {
+        if (FALLBACKS.length == 0) return "";
+        return FALLBACKS[i % FALLBACKS.length];
     }
 
     /** Cópia da lista de títulos do repertório atual. */
@@ -234,12 +243,19 @@ public final class PlayerMusicas {
             }
             TITULOS = finaisT.toArray(new String[0]);
             URLS = finaisU.toArray(new String[0]);
+            String[] fbs = BancoMusicas.fallbacks();
+            String[] finaisF = new String[finaisT.size()];
+            for (int i = 0; i < finaisF.length; i++) {
+                finaisF[i] = i < fbs.length ? fbs[i] : "";
+            }
+            FALLBACKS = finaisF;
             buscaOk = true;
             termoUsado = termo;
         } else {
             TITULOS = BancoMusicas.titulos();
             URLS = BancoMusicas.urls();
             buscaOk = false;
+            FALLBACKS = BancoMusicas.fallbacks();
         }
     }
 
@@ -400,6 +416,10 @@ public final class PlayerMusicas {
     }
 
     private static void tocar(final Context ctx, final int deOnde) {
+        tocar(ctx, deOnde, false);
+    }
+
+    private static void tocar(final Context ctx, final int deOnde, final boolean viaFallback) {
         liberarPlayer();
         tocando = false;
         carregando = true;
@@ -411,7 +431,12 @@ public final class PlayerMusicas {
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .build());
-            mp.setDataSource(ctx, Uri.parse(URLS[indice % URLS.length]));
+            String fonte = URLS[indice % URLS.length];
+            if (viaFallback) {
+                String fb = urlFallbackEm(indice);
+                if (fb != null && !fb.isEmpty()) fonte = fb;
+            }
+            mp.setDataSource(ctx, Uri.parse(fonte));
             mp.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared(MediaPlayer p) {
@@ -441,12 +466,26 @@ public final class PlayerMusicas {
                 @Override
                 public boolean onError(MediaPlayer p, int what, int extra) {
                     if (p != player) return true;
+                    if (!viaFallback) {
+                        String fb = urlFallbackEm(indice);
+                        if (fb != null && !fb.isEmpty()) {
+                            tocar(ctx.getApplicationContext(), indice, true);
+                            return true;
+                        }
+                    }
                     tentarSeguinte(ctx.getApplicationContext());
                     return true;
                 }
             });
             mp.prepareAsync();
         } catch (Exception e) {
+            if (!viaFallback) {
+                String fb = urlFallbackEm(indice);
+                if (fb != null && !fb.isEmpty()) {
+                    tocar(ctx.getApplicationContext(), indice, true);
+                    return;
+                }
+            }
             tentarSeguinte(ctx.getApplicationContext());
         }
     }

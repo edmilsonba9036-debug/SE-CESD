@@ -354,8 +354,27 @@ public class AtividadePainel extends AtividadeBase {
                         iniciarDownload(faixa);
                     }
                 })
-                .setNeutralButton("Cancelar", null)
+                .setNeutralButton("▶ YT Music", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        abrirNoYoutubeMusic(titulo);
+                    }
+                })
                 .show();
+    }
+
+    /** Variedade infinita: abre a canção na busca do YouTube Music oficial. */
+    private void abrirNoYoutubeMusic(String titulo) {
+        try {
+            String q = titulo.split(" — ")[0].trim();
+            android.net.Uri destino = android.net.Uri.parse(
+                    "https://music.youtube.com/search?q=" + android.net.Uri.encode(q));
+            startActivity(new Intent(android.content.Intent.ACTION_VIEW, destino));
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this,
+                    "Não achei o YouTube Music — instale o app dele ou use o navegador.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
     }
 
     private void iniciarDownload(final int faixa) {
@@ -381,14 +400,24 @@ public class AtividadePainel extends AtividadeBase {
                             public void run() {
                                 String fim;
                                 try {
-                                    byte[] bytes = PlayerMusicas.baixarBytes(url, 15000, 60000);
+                                    String fonte = url;
+                                    byte[] bytes = null;
+                                    try {
+                                        bytes = PlayerMusicas.baixarBytes(url, 15000, 60000);
+                                    } catch (Exception ign) { bytes = null; }
+                                    String reserva = PlayerMusicas.urlFallbackEm(faixa);
+                                    if ((bytes == null || bytes.length < 1000)
+                                            && reserva != null && !reserva.isEmpty()) {
+                                        bytes = PlayerMusicas.baixarBytes(reserva, 15000, 60000);
+                                        fonte = reserva;
+                                    }
                                     if (bytes == null || bytes.length < 1000) {
                                         fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";
                                     } else {
-                                        String mime = url.toLowerCase().contains(".ogg")
+                                        String mime = fonte.toLowerCase().contains(".ogg")
                                                 ? "audio/ogg" : "audio/mpeg";
                                         fim = DriveBackup.enviarMusica(AtividadePainel.this,
-                                                nomeArquivoSeguro(titulo, url), bytes, mime);
+                                                nomeArquivoSeguro(titulo, fonte), bytes, mime);
                                     }
                                 } catch (Exception e) {
                                     fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";

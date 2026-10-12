@@ -79,6 +79,46 @@ public final class BancoMusicas {
             "https://www2.fab.mil.br/afa/media/k2/audio/83.mp3"
     };
 
+    /**
+     * ESPELHOS (reserva por canção, mesma posição de TITULOS/URLS):
+     * se a fonte principal estiver fora do ar, o player toca o espelho
+     * na hora. Vazio = sem espelho conhecido. Cada canção importante
+     * tem o espelho na OUTRA família de hospedagem (Marinha ↔ AFA ↔
+     * Archive/Commons) — um apagão de um lado não mata a música.
+     */
+    private static final String[] FALLBACKS = {
+            "https://upload.wikimedia.org/wikipedia/commons/9/9b/Hino_Nacional_Brasileiro_instrumental.ogg",
+            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.01.%20Hino%20Nacional.mp3",
+            "https://www2.fab.mil.br/afa/media/k2/audio/325.mp3",
+            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Bandeira.mp3",
+            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.02.%20Hino%20Da%20Independ%C3%AAncia.mp3",
+            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.03.%20Hino%20Da%20Proclama%C3%A7%C3%A3o%20Da%20Rep%C3%BAblica.mp3",
+            "https://upload.wikimedia.org/wikipedia/commons/a/a6/Hino_%C3%A0_Proclama%C3%A7%C3%A3o_da_Rep%C3%BAblica_-_Ex%C3%A9rcito_Brasileiro_-_Coral.ogg",
+            "",
+            "https://www2.fab.mil.br/afa/media/k2/audio/319.mp3",
+            "https://www2.fab.mil.br/afa/media/k2/audio/81.mp3",
+            "https://www2.fab.mil.br/afa/media/k2/audio/86.mp3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "https://hinomp3.com/hinos/f/hino-dos-aviadores-fab.mp3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+    };
+
     private BancoMusicas() {}
 
     public static int total() {
@@ -91,5 +131,9 @@ public final class BancoMusicas {
 
     public static String[] urls() {
         return URLS.clone();
+    }
+
+    public static String[] fallbacks() {
+        return FALLBACKS.clone();
     }
 }
