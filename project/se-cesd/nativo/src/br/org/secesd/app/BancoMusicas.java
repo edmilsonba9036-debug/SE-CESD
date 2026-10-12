@@ -1,173 +1,64 @@
 package br.org.secesd.app;
 
 /**
- * BANCO DE LINKS das canções militares do player — curadoria das
- * melhores e mais bonitas, das três Forças Armadas federais do Brasil
- * (Marinha, Exército e FAB) mais os hinos nacionais cerimoniais.
- * URLs verificadas e estáveis: site oficial da Marinha, site oficial
- * da AFA/FAB (www2.fab.mil.br/afa — quadro completo de canções),
- * Internet Archive (Fuzileiros Navais), Wikimedia Commons (domínio
- * público) e cópias preservadas do Colégio Militar de Brasília.
- * Curadoria revisada em 02/10/2026.
+ * REPERTÓRIO do player: as melhores canções militares do Brasil,
+ * TODAS no YouTube Music (a única fonte de reprodução do app).
+ * Cada link foi VERIFICADO vivo via oembed do YouTube em 02/10/2026
+ * — incluindo gravações de canais oficiais (Exército Brasileiro,
+ * bandas militares) e vídeos legendados das canções clássicas.
  */
 public final class BancoMusicas {
 
-    /** Título — origem (uma linha por canção, na ordem de execução). */
+    /** As melhores canções militares — toque abre direto no YT Music. */
     private static final String[] TITULOS = {
-            "Hino Nacional Brasileiro (coral) — Banda dos Fuzileiros Navais",
-            "Hino Nacional Brasileiro (banda) — U.S. Navy Band",
-            "Hino à Bandeira (banda) — Banda da Marinha",
-            "Hino à Bandeira Nacional (coral) — FAB, Academia da Força Aérea",
-            "Hino da Independência — Banda da Marinha",
-            "Hino à Proclamação da República (coral) — Exército Brasileiro",
-            "Hino da Proclamação da República (banda) — Fuzileiros Navais",
-            "Hino da Aviação Naval — Banda da Marinha",
-            "Cisne Branco — Banda da Marinha",
-            "Canção do Expedicionário (FEB) — Banda da Marinha",
-            "Fibra de Herói — Banda da Marinha",
-            "Soldados da Liberdade — Banda da Marinha",
-            "Canção da Esquadra — Banda da Marinha",
-            "Canção da Infantaria — Banda da Marinha",
-            "Hino da Escola Naval — Banda da Marinha",
-            "Adeus Escola Querida — Banda da Marinha",
-            "Hino da DNOG — Banda da Marinha",
-            "Na Vanguarda — Banda da Marinha",
-            "Regimento Naval — Banda da Marinha",
-            "Viva a Marinha — Banda da Marinha",
-            "Canção do Exército — Colégio Militar de Brasília (EB)",
-            "Avante Camaradas — Colégio Militar de Brasília (EB)",
-            "Hino dos Aviadores — FAB, gravação oficial (AFA)",
-            "Canção da Intendência da Aeronáutica — FAB (oficial)",
-            "Bandeirantes do Ar (Hino da AFA) — FAB (oficial)",
-            "Canção do Cadete da Aeronáutica — FAB (oficial)",
-            "Canção do Especialista da Aeronáutica — FAB (oficial)",
-            "Canção do Paraquedista (Eterno Herói) — FAB (oficial)",
-            "Canção das Comunicações da Aeronáutica — FAB (oficial)",
-            "Canção da Engenharia da Aeronáutica — FAB (oficial)"
-    };
-
-    private static final String[] URLS = {
-            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.01.%20Hino%20Nacional.mp3",
-            "https://upload.wikimedia.org/wikipedia/commons/9/9b/Hino_Nacional_Brasileiro_instrumental.ogg",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Bandeira.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/325.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Independencia.mp3",
-            "https://upload.wikimedia.org/wikipedia/commons/a/a6/Hino_%C3%A0_Proclama%C3%A7%C3%A3o_da_Rep%C3%BAblica_-_Ex%C3%A9rcito_Brasileiro_-_Coral.ogg",
-            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.03.%20Hino%20Da%20Proclama%C3%A7%C3%A3o%20Da%20Rep%C3%BAblica.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Avia%C3%A7%C3%A3o.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Cisne%20Branco.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Can%C3%A7%C3%A3o%20Expedicion%C3%A1rio.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Fibra%20de%20Heroi.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Soldados%20da%20Liberdade.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Can%C3%A7%C3%A3o%20da%20Esquadra.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Can%C3%A7%C3%A3o%20da%20Infantaria.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20Escola%20Naval.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Adeus%20Escola%20Querida.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20DNOG.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Na%20Vanguarda.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/RegimentoNaval.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Viva%20A%20Marinha.mp3",
-            "https://web.archive.org/web/20211230041330mp_/http://www.cmb.eb.mil.br/images/audios/Musica/Cancao%20do%20Exercito.mp3",
-            "https://web.archive.org/web/20211230041341mp_/http://www.cmb.eb.mil.br/images/audios/Musica/Avante%20Camaradas.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/82.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/78.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/77.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/318.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/80.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/85.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/84.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/83.mp3"
-    };
-
-    /**
-     * ESPELHOS (reserva por canção, mesma posição de TITULOS/URLS):
-     * se a fonte principal estiver fora do ar, o player toca o espelho
-     * na hora. Vazio = sem espelho conhecido. Cada canção importante
-     * tem o espelho na OUTRA família de hospedagem (Marinha ↔ AFA ↔
-     * Archive/Commons) — um apagão de um lado não mata a música.
-     */
-    private static final String[] FALLBACKS = {
-            "https://upload.wikimedia.org/wikipedia/commons/9/9b/Hino_Nacional_Brasileiro_instrumental.ogg",
-            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.01.%20Hino%20Nacional.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/325.mp3",
-            "https://www.marinha.mil.br/sites/www.marinha.mil.br.en/files/upload/Hino%20da%20Bandeira.mp3",
-            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.02.%20Hino%20Da%20Independ%C3%AAncia.mp3",
-            "https://archive.org/download/lp_hinario-nacional_banda-sinfonica-do-corpo-de-fuzileiros/disc1/01.03.%20Hino%20Da%20Proclama%C3%A7%C3%A3o%20Da%20Rep%C3%BAblica.mp3",
-            "https://upload.wikimedia.org/wikipedia/commons/a/a6/Hino_%C3%A0_Proclama%C3%A7%C3%A3o_da_Rep%C3%BAblica_-_Ex%C3%A9rcito_Brasileiro_-_Coral.ogg",
-            "",
-            "https://www2.fab.mil.br/afa/media/k2/audio/319.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/81.mp3",
-            "https://www2.fab.mil.br/afa/media/k2/audio/86.mp3",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "https://hinomp3.com/hinos/f/hino-dos-aviadores-fab.mp3",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
-    };
-
-    /**
-     * SUGESTÕES curadas para ouvir no YouTube Music — links VERIFICADOS
-     * (vídeos vivos em 02/10/2026). Tocar/baixar é pelo app oficial.
-     */
-    private static final String[] SUGESTOES_TITULOS = {
+            "Hino Nacional Brasileiro — Coral do Exército",
+            "Canção do Exército — gravação oficial do Exército",
+            "Hino a Caxias — Exército",
             "Ardor do Infante — Infantaria do Exército",
             "Nobre Infantaria — Infantaria do Exército",
-            "Hino a Caxias — Exército",
-            "Canção da AMAN — Agulhas Negras",
+            "Canção do Expedicionário (FEB) — legendada",
+            "Cisne Branco — Canção da Marinha",
+            "Hino dos Aviadores — FAB",
+            "Bandeirantes do Ar — Hino da AFA (legendado)",
+            "Canção da Infantaria da Aeronáutica — FAB",
+            "Canção da AMAN — Academia das Agulhas Negras",
             "Marcha da Despedida — FAB/EEAR",
             "Aviação de Transporte de Tropa — FAB",
-            "Dobrado Brasília — Banda da FAB (CINDACTA II)",
-            "Playlist: Dobrados e Hinos Militares (56 faixas)"
+            "Dobrado Brasília — Banda da FAB (CINDACTA II)"
     };
 
-    private static final String[] SUGESTOES_LINKS = {
+    private static final String[] LINKS = {
+            "https://music.youtube.com/watch?v=1hnQjNojGp0",
+            "https://music.youtube.com/watch?v=spJkc0MIfpw",
+            "https://music.youtube.com/watch?v=1kAul-eQNlY",
             "https://music.youtube.com/watch?v=JEyEdi7Kf3Y",
             "https://music.youtube.com/watch?v=QP5uXGLBWMM",
-            "https://music.youtube.com/watch?v=1kAul-eQNlY",
+            "https://music.youtube.com/watch?v=uDvBz7LGpbw",
+            "https://music.youtube.com/watch?v=A2K_hTlJ-rQ",
+            "https://music.youtube.com/watch?v=TdoWtM2mULs",
+            "https://music.youtube.com/watch?v=7Vcvcx8ixJs",
+            "https://music.youtube.com/watch?v=8HcGO_kiqSA",
             "https://music.youtube.com/watch?v=R9fzOK9c5UU",
             "https://music.youtube.com/watch?v=VbudcLdsaA4",
             "https://music.youtube.com/watch?v=bjPSUl8pr5M",
-            "https://music.youtube.com/watch?v=3PPcRPEISiA",
-            "https://music.youtube.com/playlist?list=PLHHgcpF3ODBpODQHPCPgGlg5yHVPnvVvm"
+            "https://music.youtube.com/watch?v=3PPcRPEISiA"
     };
 
-    private BancoMusicas() {}
+    /** A playlist de ouro: 56 dobrados, marchas e hinos (YT Music). */
+    private static final String PLAYLIST =
+            "https://music.youtube.com/playlist?list=PLHHgcpF3ODBpODQHPCPgGlg5yHVPnvVvm";
 
-    public static int total() {
-        return TITULOS.length;
-    }
+    private BancoMusicas() {}
 
     public static String[] titulos() {
         return TITULOS.clone();
     }
 
-    public static String[] urls() {
-        return URLS.clone();
+    public static String[] links() {
+        return LINKS.clone();
     }
 
-    public static String[] fallbacks() {
-        return FALLBACKS.clone();
-    }
-
-    public static String[] sugestoesTitulos() {
-        return SUGESTOES_TITULOS.clone();
-    }
-
-    public static String[] sugestoesLinks() {
-        return SUGESTOES_LINKS.clone();
+    public static String playlist() {
+        return PLAYLIST;
     }
 }

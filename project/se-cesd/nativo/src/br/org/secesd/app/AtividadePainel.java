@@ -19,31 +19,9 @@ public class AtividadePainel extends AtividadeBase {
 
     private View farol;
     private android.widget.Button botaoMusica;
-    private TextView textoMusica;
     private TextView dicaMusica;
     private android.widget.Button botaoListaMusica;
-    private final android.os.Handler relogioMusica = new android.os.Handler();
 
-
-    private String rotuloMusica() {
-        if (!PlayerMusicas.tocando()) return "▶  Tocar canções militares";
-        return "⏹  Parar a música";
-    }
-
-    private void atualizarMusica() {
-        if (botaoMusica == null || textoMusica == null) return;
-        botaoMusica.setText(rotuloMusica());
-        if (PlayerMusicas.tocando()) {
-            textoMusica.setText("♪  " + PlayerMusicas.tituloAtual());
-        } else {
-            textoMusica.setText("(parado)");
-        }
-        int extras = PlayerMusicas.total() - PlayerMusicas.totalBanco();
-        dicaMusica.setText("Banco: " + PlayerMusicas.totalBanco() + " canções (Marinha · Exército · FAB)"
-                + (extras > 0 ? " + " + extras + " descobertas ao vivo" : "")
-                + (PlayerMusicas.buscaEmTempoRealOk() ? " ✓" : " · sem internet agora")
-                + " · toque no nome para trocar");
-    }
 
     /** Verde: automatico LIGADO + conta conectada + sem pausa. Vermelho: o contrario. */
     private int corFarol() {
@@ -79,30 +57,11 @@ public class AtividadePainel extends AtividadeBase {
     protected void onResume() {
         super.onResume();
         recolorirFarol();
-        atualizarMusica();
-        relogioMusica.postDelayed(tiqueMusica, 800);
-    }
-
-    private final Runnable tiqueMusica = new Runnable() {
-        @Override
-        public void run() {
-            atualizarMusica();
-            if (isFinishing()) return;
-            relogioMusica.postDelayed(this, 800);
-        }
-    };
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        relogioMusica.removeCallbacks(tiqueMusica);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        relogioMusica.removeCallbacks(tiqueMusica);
-        PlayerMusicas.parar();
     }
 
     @Override
@@ -153,31 +112,18 @@ public class AtividadePainel extends AtividadeBase {
         menu(coluna, "BK", COR_EXERCITO, "Backup no Google Drive",
                 "Automático, criptografado, no seu Drive", AtividadeBackup.class);
 
-        // CANCOES MILITARES — toca direto da internet
+        // CANÇÕES MILITARES — via YouTube Music (fonte única)
         coluna.addView(titulo("Canções militares"));
         LinearLayout cartaoMusica = cartao();
-        botaoMusica = botao(rotuloMusica(), true);
+        botaoMusica = botao("▶  Tocar no YouTube Music", true);
         botaoMusica.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                PlayerMusicas.alternar(AtividadePainel.this);
-                atualizarMusica();
+                abrirNoYoutubeMusicLink(BancoMusicas.playlist());
             }
         });
         cartaoMusica.addView(botaoMusica, largura());
-        textoMusica = texto("");
-        textoMusica.setGravity(android.view.Gravity.CENTER);
-        textoMusica.setTypeface(Typeface.DEFAULT_BOLD);
-        textoMusica.setPadding(0, px(10), 0, 0);
-        textoMusica.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                PlayerMusicas.proxima(AtividadePainel.this);
-                atualizarMusica();
-            }
-        });
-        cartaoMusica.addView(textoMusica, largura());
-        botaoListaMusica = botao("☰  Escolher canção do repertório", false);
+        botaoListaMusica = botao("☰  Repertório — as melhores canções", false);
         botaoListaMusica.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -185,7 +131,7 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(botaoListaMusica, largura());
-        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher · ▶ YT Music pra variar");
+        dicaMusica = texto("O YouTube Music é a fonte das canções · ☰ abre o repertório");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
@@ -304,37 +250,22 @@ public class AtividadePainel extends AtividadeBase {
     }
 
 
-    /** Lista o repertório (com buscar na internet e YT Music no topo). */
+    /** O repertório: as melhores canções militares, no YouTube Music. */
     private void escolherMusica() {
-        final String[] titulos = PlayerMusicas.listaTitulos();
-        if (titulos == null || titulos.length == 0) {
-            android.widget.Toast.makeText(this,
-                    "Toque ▶ uma vez para montar o repertório.",
-                    android.widget.Toast.LENGTH_LONG).show();
-            return;
-        }
-        final String[] base = new String[titulos.length + 1];
-        base[0] = "▶  Buscar no YouTube Music";
-        System.arraycopy(titulos, 0, base, 1, titulos.length);
-        final String[] sugT = BancoMusicas.sugestoesTitulos();
-        final String[] sugL = BancoMusicas.sugestoesLinks();
-        final String[] itens = new String[base.length + sugT.length];
-        System.arraycopy(base, 0, itens, 0, base.length);
-        for (int i = 0; i < sugT.length; i++) {
-            itens[base.length + i] = "⭐  " + sugT[i] + "  (YT Music)";
-        }
+        final String[] titulos = BancoMusicas.titulos();
+        final String[] links = BancoMusicas.links();
+        final String[] itens = new String[titulos.length + 1];
+        itens[0] = "▶  Buscar no YouTube Music";
+        for (int i = 0; i < titulos.length; i++) itens[i + 1] = "♪  " + titulos[i];
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Canções militares — " + titulos.length
-                        + " no repertório + " + sugT.length + " sugestões")
+                .setTitle("Repertório — as " + titulos.length + " melhores militares")
                 .setItems(itens, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
                         if (qual == 0) {
                             dialogoBuscarYoutube();
-                        } else if (qual <= titulos.length) {
-                            perguntarOuvirOuBaixar(qual - 1, titulos[qual - 1]);
                         } else {
-                            abrirNoYoutubeMusicLink(sugL[qual - base.length]);
+                            abrirNoYoutubeMusicLink(links[qual - 1]);
                         }
                     }
                 })
@@ -373,27 +304,6 @@ public class AtividadePainel extends AtividadeBase {
                     }
                 })
                 .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private void perguntarOuvirOuBaixar(final int faixa, String titulo) {
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("♪ " + titulo)
-                .setMessage("O que você quer fazer com esta canção?")
-                .setPositiveButton("Ouvir agora", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        PlayerMusicas.tocarIndice(AtividadePainel.this, faixa);
-                        atualizarMusica();
-                    }
-                })
-                .setNegativeButton("▶ YT Music", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        abrirNoYoutubeMusic(titulo);
-                    }
-                })
-                .setNeutralButton("Cancelar", null)
                 .show();
     }
 

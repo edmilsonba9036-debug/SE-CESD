@@ -1209,95 +1209,6 @@ public class DriveBackup {
         return m.isEmpty() ? "Sem conexão com o Google Drive." : m;
     }
 
-    // ------------------------------------------------------------------
-    // CANÇÕES MILITARES — downloads do player para o Drive
-    // ------------------------------------------------------------------
-
-    /** Nome da pasta no Drive onde o player guarda as canções baixadas. */
-    public static final String PASTA_CANC = "Canções Militares";
-
-    /** Mensagem devolvida quando a canção já existe na pasta. */
-    public static final String MSG_JA_ESTAVA =
-            "Essa canção já estava na pasta Canções Militares ✓";
-
-    /**
-     * Envia uma canção para a pasta Canções Militares no Drive (a mesma
-     * conta do backup). Chamar FORA da thread da tela. Devolve null se
-     * deu certo, ou a mensagem para o usuário.
-     */
-    public static String enviarMusica(Activity a, String nomeArquivo, byte[] bytes, String mime) {
-        try {
-            DriveBackup db = new DriveBackup(a, null);
-            return db.enviarMusicaInterna(nomeArquivo, bytes, mime);
-        } catch (PrecisaTela tela) {
-            return "O Google quer uma autorização: abra a tela Backup uma vez "
-                    + "(ela conecta sozinha) e depois tente baixar de novo.";
-        } catch (Exception e) {
-            return "Não deu para enviar ao Drive: " + String.valueOf(e.getMessage());
-        }
-    }
-
-    /** null = enviada; MSG_JA_ESTAVA = já existia; exceção = falhou. */
-    private String enviarMusicaInterna(String nomeArquivo, byte[] bytes, String mime) throws Exception {
-        for (int tentativa = 0; tentativa < 2; tentativa++) {
-            String t = obterToken();
-            String pastaId = garantirPastaMusicas(t);
-            if (localizarMusica(t, pastaId, nomeArquivo) != null) return MSG_JA_ESTAVA;
-            JSONObject meta = new JSONObject();
-            meta.put("name", nomeArquivo);
-            meta.put("mimeType", mime);
-            org.json.JSONArray pais = new org.json.JSONArray();
-            pais.put(pastaId);
-            meta.put("parents", pais);
-            String limite = "secesdmusica" + System.currentTimeMillis();
-            byte[] corpo = multipart(limite, meta.toString(), bytes);
-            HttpURLConnection conn = abrir(API_UPLOAD + "files?uploadType=multipart&fields=id", t, "POST");
-            conn.setRequestProperty("Content-Type", "multipart/related; boundary=" + limite);
-            escrever(conn, corpo);
-            int codigo = conn.getResponseCode();
-            String resposta = ler(conn, codigo);
-            conn.disconnect();
-            if (codigo >= 200 && codigo < 300) return null;
-            if (codigo == 401 && tentativa == 0) { token = null; continue; }
-            if ((codigo >= 500 || codigo == 403) && tentativa == 0) {
-                try { Thread.sleep(1500); } catch (InterruptedException ie) { }
-                continue;
-            }
-            throw new IOException("HTTP " + codigo + ": " + resumo(resposta));
-        }
-        throw new IOException("O Google não aceitou o envio após duas tentativas.");
-    }
-
-    private String garantirPastaMusicas(String t) throws Exception {
-        String q = "name='" + PASTA_CANC + "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-        org.json.JSONArray achadas = buscar(t, q);
-        String cesd = localizarPastaCESD(t);
-        String id = null;
-        if (cesd != null) id = escolherDentroDoCESD(achadas, cesd);
-        if (id == null) id = primeiro(achadas);
-        if (id != null) {
-            moverParaCESD(t, id);
-            return id;
-        }
-        String raiz = localizarPastaCESD(t);
-        JSONObject meta = new JSONObject();
-        meta.put("name", PASTA_CANC);
-        meta.put("mimeType", "application/vnd.google-apps.folder");
-        if (raiz != null) {
-            org.json.JSONArray paisMusicas = new org.json.JSONArray();
-            paisMusicas.put(raiz);
-            meta.put("parents", paisMusicas);
-        }
-        HttpURLConnection conn = abrir(API + "files?fields=id", t, "POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        escrever(conn, meta.toString().getBytes(StandardCharsets.UTF_8));
-        int codigo = conn.getResponseCode();
-        String corpo = ler(conn, codigo);
-        conn.disconnect();
-        if (codigo < 200 || codigo >= 300) throw new IOException("HTTP " + codigo + " ao criar a pasta no Drive.");
-        return new JSONObject(corpo).getString("id");
-    }
-
     /**
      * Localiza a pasta CESD QUE O USUÁRIO JÁ TEM no Drive (dentro de MILIT).
      * NUNCA cria pasta: se não achar, devolve null e o app segue sem mexer.
@@ -1381,8 +1292,4 @@ public class DriveBackup {
         }
     }
 
-    private String localizarMusica(String t, String pastaId, String nomeArquivo) throws Exception {
-        String q = "name='" + nomeArquivo + "' and '" + pastaId + "' in parents and trashed=false";
-        return primeiro(buscar(t, q));
-    }
 }
