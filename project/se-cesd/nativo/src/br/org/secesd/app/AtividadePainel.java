@@ -293,7 +293,7 @@ public class AtividadePainel extends AtividadeBase {
         new android.app.AlertDialog.Builder(this)
                 .setTitle("▶ Buscar no YouTube Music")
                 .setMessage("Abre a sua busca direto no YouTube Music oficial — "
-                        + "a variedade de lá é toda sua (para ouvir/baixar pelo app deles).")
+                        + "a variedade de lá é toda sua, direto no app oficial deles.")
                 .setView(campo)
                 .setPositiveButton("Abrir", new DialogInterface.OnClickListener() {
                     @Override
