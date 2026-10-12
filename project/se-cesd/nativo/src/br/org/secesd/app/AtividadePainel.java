@@ -194,7 +194,7 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(botaoListaMusica, largura());
-        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher · ⬇ baixar");
+        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher e buscar · ⬇ baixa");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
@@ -316,7 +316,7 @@ public class AtividadePainel extends AtividadeBase {
         iniciarDownload(PlayerMusicas.indiceAtual());
     }
 
-    /** Lista o repertório; toque numa canção para ouvir ou baixar. */
+    /** Lista o repertório (com buscar na internet e YT Music no topo). */
     private void escolherMusica() {
         final String[] titulos = PlayerMusicas.listaTitulos();
         if (titulos == null || titulos.length == 0) {
@@ -325,15 +325,96 @@ public class AtividadePainel extends AtividadeBase {
                     android.widget.Toast.LENGTH_LONG).show();
             return;
         }
+        final String[] itens = new String[titulos.length + 2];
+        itens[0] = "🔎  Buscar canções na internet (digite o nome)";
+        itens[1] = "▶  Buscar no YouTube Music";
+        System.arraycopy(titulos, 0, itens, 2, titulos.length);
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Repertório — " + titulos.length + " canções")
-                .setItems(titulos, new DialogInterface.OnClickListener() {
+                .setTitle("Canções militares — " + titulos.length + " no repertório")
+                .setItems(itens, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
-                        perguntarOuvirOuBaixar(qual, titulos[qual]);
+                        if (qual == 0) {
+                            dialogoBuscarInternet();
+                        } else if (qual == 1) {
+                            dialogoBuscarYoutube();
+                        } else {
+                            perguntarOuvirOuBaixar(qual - 2, titulos[qual - 2]);
+                        }
                     }
                 })
                 .setNegativeButton("Fechar", null)
+                .show();
+    }
+
+    private void dialogoBuscarInternet() {
+        final android.widget.EditText campo = new android.widget.EditText(this);
+        campo.setHint("Ex.: dobrado militar, hino dos aviadores, feb…");
+        campo.setTextSize(16);
+        int p = px(20);
+        campo.setPadding(p, px(12), p, 0);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("🔎 Buscar canções")
+                .setMessage("Digite o nome da canção ou o tipo (dobrado, hino, banda). "
+                        + "O app procura na internet, toca e deixa baixar pro Drive.")
+                .setView(campo)
+                .setPositiveButton("Buscar", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        final String termo = campo.getText().toString().trim();
+                        if (termo.isEmpty()) return;
+                        android.widget.Toast.makeText(AtividadePainel.this,
+                                "Procurando “" + termo + "”…",
+                                android.widget.Toast.LENGTH_SHORT).show();
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                final int n = PlayerMusicas.buscarTermo(termo);
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (n == 0) {
+                                            android.widget.Toast.makeText(AtividadePainel.this,
+                                                    "Nada encontrado com esse termo agora. "
+                                                            + "Tente outra palavra ou use o YT Music.",
+                                                    android.widget.Toast.LENGTH_LONG).show();
+                                        } else {
+                                            android.widget.Toast.makeText(AtividadePainel.this,
+                                                    n + " canções encontradas ✓",
+                                                    android.widget.Toast.LENGTH_SHORT).show();
+                                            atualizarMusica();
+                                            escolherMusica();
+                                        }
+                                    }
+                                });
+                            }
+                        }).start();
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void dialogoBuscarYoutube() {
+        final android.widget.EditText campo = new android.widget.EditText(this);
+        campo.setHint("Ex.: dobrado general osório, canção do soldado…");
+        campo.setTextSize(16);
+        int p = px(20);
+        campo.setPadding(p, px(12), p, 0);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("▶ Buscar no YouTube Music")
+                .setMessage("Abre a sua busca direto no YouTube Music oficial — "
+                        + "a variedade de lá é toda sua (para ouvir/baixar pelo app deles).")
+                .setView(campo)
+                .setPositiveButton("Abrir", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int qual) {
+                        String termo = campo.getText().toString().trim();
+                        if (termo.isEmpty()) termo = "canções militares brasileiras";
+                        abrirNoYoutubeMusic(termo);
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
                 .show();
     }
 

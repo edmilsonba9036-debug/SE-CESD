@@ -214,6 +214,31 @@ public final class PlayerMusicas {
     // BUSCA EM TEMPO REAL
     // ------------------------------------------------------------------
 
+    /**
+     * Busca viva com o TERMO DIGITADO pelo usuário (☰ → Buscar).
+     * Achou algo? vira o repertório novo (toca e baixa dentro do app).
+     * Devolve quantas canções encontrou (0 = nada).
+     */
+    public static int buscarTermo(final String termo) {
+        ArrayList<String> titulos = new ArrayList<String>();
+        ArrayList<String> urls = new ArrayList<String>();
+        HashSet<String> usadas = new HashSet<String>();
+        buscarNoArchive(termo, titulos, urls, usadas);
+        if (titulos.size() < 8) buscarNoCommons(termo, titulos, urls, usadas);
+        if (titulos.isEmpty()) return 0;
+        synchronized (PlayerMusicas.class) {
+            TITULOS = titulos.toArray(new String[0]);
+            URLS = urls.toArray(new String[0]);
+            String[] fbs = new String[TITULOS.length];
+            for (int i = 0; i < fbs.length; i++) fbs[i] = "";
+            FALLBACKS = fbs;
+            buscaOk = true;
+            termoUsado = termo;
+            indice = 0;
+        }
+        return TITULOS.length;
+    }
+
     /** BANCO curado na frente; descobertas da busca ao vivo entram no fim. */
     private static void buscarEmTempoReal() {
         String termo = TERMOS[contadorBuscas++ % TERMOS.length];
