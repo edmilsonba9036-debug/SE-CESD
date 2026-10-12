@@ -1,0 +1,140 @@
+name: Atualiza zip do código-fonte
+
+# Sempre que o aplicativo mudar (qualquer arquivo dentro de
+# project/se-cesd/nativo), este robô re-monta o zip do código-fonte
+# e atualiza o arquivo SE-CESD-codigo-fonte-nativo.zip no repositório.
+on:
+  push:
+    branches: [arena/01a0ee2d-se-cesd, main]
+    paths:
+      - 'project/se-cesd/nativo/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualiza-zip-codigo-fonte
+  cancel-in-progress: true
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Montar o zip com a versão mais nova
+        run: |
+          python3 - <<'PY'
+          import zipfile, os, subprocess, glob, datetime
+
+          raiz = 'project/se-cesd/nativo'
+          destino = 'project/se-cesd/SE-CESD-codigo-fonte-nativo.zip'
+
+          # Versão: lê do APK publicado (se a ferramenta do SDK existir aqui)
+          versao = ''
+          try:
+              base = os.environ.get('ANDROID_HOME') or '/usr/local/lib/android/sdk'
+              cands = sorted(glob.glob(base + '/build-tools/*/aapt2'), reverse=True)
+              if cands:
+                  r = subprocess.run([cands[0], 'dump', 'badging',
+                                      'project/se-cesd/SE-CESD-nativo-v1.1.apk'],
+                                     capture_output=True, text=True)
+                  for linha in r.stdout.splitlines():
+                      if linha.startswith('package:'):
+                          for p in linha.split():
+                              if p.startswith('versionName='):
+                                  versao = p.split('=', 1)[1].strip("'")
+          except Exception:
+              pass
+          if not versao:
+              versao = 'publicada no repositório'
+
+          sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'],
+                               capture_output=True, text=True).stdout.strip()
+          quando = datetime.datetime.utcnow().strftime('%d/%m/%Y %H:%M UTC')
+
+          desc = {
+              'AtividadeAcesso': 'porta de entrada: acesso com usuário/senha',
+              'AtividadeBase': 'base das telas + salvamento automático + backup automático',
+              'AtividadePainel': 'painel principal (farol, player, baixar no Drive, escolher canção)',
+              'AtividadeCadastro': 'cadastro pessoal (salva sozinho ao digitar)',
+              'AtividadeMemorialVida': 'memorial da vida (12 linhas + fatos)',
+              'AtividadeTrajetoria': 'trajetória (etapas da carreira)',
+              'AtividadeDocumentos': 'documentos (4 locais)',
+              'AtividadeGaleria': 'galeria com zoom',
+              'AtividadeBackup': 'tela do backup no Google Drive',
+              'Cofre': 'criptografia (PBKDF2 120.000 + AES-256-GCM)',
+              'Digital': 'abertura por impressão digital',
+              'DriveBackup': 'backup no Drive, pasta CESD 26, canções militares',
+              'PlayerMusicas': 'player: banco de canções + busca ao vivo (Archive/Commons)',
+              'BancoMusicas': 'banco curado de links (3 Forças)',
+              'ImagemComZoomView': 'visualizador de imagem com zoom',
+              'SabreAladoView': 'o sabre de luz animado'
+          }
+          srcdir = os.path.join(raiz, 'src/br/org/secesd/app')
+          classes = []
+          for f in sorted(os.listdir(srcdir)):
+              if f.endswith('.java'):
+                  n = f[:-5]
+                  classes.append((n, desc.get(n, 'classe do aplicativo')))
+          lista = '\n'.join('  %s ....... %s' % (n, d) for n, d in classes)
+
+          linhas = [
+              '================================================================',
+              'SE • CESD — CÓDIGO-FONTE DO APLICATIVO NATIVO (Android)',
+              'Versão ' + versao,
+              '================================================================',
+              '',
+              'ATENÇÃO: este zip é ATUALIZADO AUTOMATICAMENTE pelo robô do GitHub',
+              '(Ações) toda vez que o aplicativo muda. O arquivo aqui é sempre a',
+              'versão mais nova. Publicado em ' + quando + ' (alteração ' + sha + ').',
+              '',
+              'COMO O PROJETO ESTÁ ORGANIZADO',
+              '  AndroidManifest.xml ....... a identidade do app (nome, ícone,',
+              '                              telas, permissões: internet, biometria)',
+              '  res/ ..................... ícones (brasão CESD)',
+              '  src/br/org/secesd/app/ ... as classes Java (o coração do app)',
+              '',
+              'AS CLASSES (para orientar a leitura)',
+              lista,
+              '',
+              'PARA COMPILAR',
+              '  Recursos com aapt2, javac 8, d8, empacotamento e assinatura.',
+              '  O APK pronto está em project/se-cesd/SE-CESD-nativo-v1.1.apk',
+              '  (sempre a versão mais nova, mesmo nome de arquivo).',
+              '',
+              'Repositório: github.com/edmilsonba9036-debug/SE-CESD',
+          ]
+          leiame = '\n'.join(linhas) + '\n'
+
+          arquivos = []
+          for pasta, _, nomes in os.walk(raiz):
+              for n in sorted(nomes):
+                  arquivos.append(os.path.join(pasta, n))
+          arquivos.sort()
+          with zipfile.ZipFile(destino, 'w', zipfile.ZIP_DEFLATED) as z:
+              zi = zipfile.ZipInfo('SE-CESD-nativo/LEIA-ME.txt')
+              zi.compress_type = zipfile.ZIP_DEFLATED
+              zi.external_attr = 0o644 << 16
+              z.writestr(zi, leiame.encode('utf-8'))
+              for a in arquivos:
+                  zi = zipfile.ZipInfo('SE-CESD-nativo/' + os.path.relpath(a, raiz).replace(os.sep, '/'))
+                  zi.compress_type = zipfile.ZIP_DEFLATED
+                  zi.external_attr = 0o644 << 16
+                  z.writestr(zi, open(a, 'rb').read())
+          print('zip montado:', destino, os.path.getsize(destino), 'bytes — versão', versao)
+          PY
+
+      - name: Publicar no repositório (só se mudou algo)
+        run: |
+          git config user.name "secesd-robot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add project/se-cesd/SE-CESD-codigo-fonte-nativo.zip
+          if git diff --cached --quiet; then
+            echo "Nada mudou no código-fonte; zip permanece igual."
+          else
+            git commit -m "código-fonte.zip atualizado automaticamente (robô)"
+            git push
+          fi

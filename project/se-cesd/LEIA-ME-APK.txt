@@ -1,0 +1,164 @@
+SE • CESD — APK reconstruído 1.0
+
+ARQUIVO
+SE-CESD.apk
+SE-CESD-1.1-drive.apk (NOVO — inclui o backup no Google Drive)
+
+APK 1.1 COM BACKUP NO DRIVE (gerado em 29/09/2026)
+- Mesmo pacote (br.org.secesd) e MESMA assinatura (SHA-1
+  25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D) — pode ser
+  instalado POR CIMA do 1.0 sem perder os dados do aparelho.
+- Acrescenta o painel “Backup no Google Drive” (nuvem, canto inferior
+  direito): enviar, restaurar (com confirmação em dois toques) e conectar.
+- Arquivo único SE-CESD-backup.json na pasta “SE • CESD” do Drive; conteúdo
+  criptografado (AES-GCM pela senha do usuário) antes de sair do aparelho.
+- Autorização sem navegador: seletor de contas e consentimento do Google
+  pelo framework Android (AccountManager) — não usa redirect, então não
+  sofre os erros “Access blocked” dos fluxos de navegador.
+- Observação de empacotamento: o AndroidManifest/resources deste APK foram
+  preservados byte a byte do 1.0 (sem recompilar recursos), por isso os
+  metadados internos de versão seguem “1.0 (1)”; o conteúdo corresponde à
+  integração 1.1 descrita acima e no código-fonte (reconstructed/).
+- Verificações realizadas: assinatura v1+v2 válida (apksigner verify),
+  certificado SHA-1 conferido contra o debug.keystore, classes.dex gerado
+  das fontes em reconstructed/ (javac AOSP 1.8 + d8 1.5.13), index.html com
+  a ponte incluída. Teste em aparelho físico segue recomendado abaixo.
+
+ESTA VERSÃO
+Este APK foi reconstruído a partir do site público fornecido e contém a página web principal incorporada localmente em um WebView Android. O aplicativo inclui JavaScript, armazenamento local do site, Web Crypto, IndexedDB/localStorage, seletor de arquivos e suporte básico a downloads.
+
+IDENTIFICAÇÃO ANDROID
+Nome exibido: SE • CESD
+Application ID: br.org.secesd
+Versão: 1.0 (1)
+Android mínimo: 8.0 (API 26)
+
+DADOS PARA OAUTH ANDROID
+Pacote (build release): br.org.secesd
+Pacote (build de teste): br.org.secesd.debug — o Gradle adiciona o sufixo '.debug' (applicationIdSuffix)
+SHA-1 do certificado desta compilação de teste (conferido contra o debug.keystore incluído):
+25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D
+SHA-256 do mesmo certificado:
+11:97:22:2D:E3:FA:89:AC:99:90:39:17:8D:28:4F:F0:F9:EA:59:12:A9:4F:F5:46:EB:32:E4:1D:B3:18:D6:86
+Validade do certificado: até 21/09/2056.
+
+O cliente OAuth "SE CESD - Backup Google Drive" é do TIPO ANDROID: não usa
+"client secret" (a identidade é comprovada pelo pacote + SHA-1 registrados no
+Google Cloud) e nem redirect URI.
+
+VERIFICAÇÃO EXTERNA REALIZADA (29/09/2026)
+O endpoint OAuth do Google foi consultado de fora, sem login, para testar o
+cliente. Resultados:
+- Client_id existe e está ativo ✓ (cliente falso de calibração respondeu
+  "invalid_client"; o nosso responde com erros específicos e o nome
+  "SE CESD - Backup Google Drive").
+- Tipo do cliente: ANDROID ✓ (confirmado pelo próprio Google).
+- Redirect por esquema customizado (br.org.secesd:/oauth2redirect e
+  br.org.secesd.debug:/oauth2redirect): BLOQUEADO — o Google respondeu
+  "redirect_uri_mismatch" e "Custom URI scheme is not enabled for your
+  Android client". Política do Google desde 2022: cliente tipo Android não
+  aceita esquema customizado.
+- Redirect por IP de loopback (http://127.0.0.1:porta): BLOQUEADO —
+  "The loopback flow has been blocked" (política vigente desde 21/10/2022
+  para clientes Android/iOS; guia oficial "Loopback IP Address flow
+  Migration Guide").
+CONCLUSÃO: fluxo por navegador (Custom Tabs) NÃO é possível com este cliente.
+O caminho oficial para cliente tipo Android é o Play Services do aparelho,
+acessado direto pelo framework Android (AccountManager/AccountPicker) — sem
+biblioteca gms e sem navegador: o consentimento é desenhado pelo Google e o
+pacote + SHA-1 são validados pelo serviço de contas. Constantes em
+DriveOAuth.java; implementação em DriveBackupManager.java.
+ALTERNATIVA (se um dia quiser fluxo por navegador): criar no mesmo projeto um
+segundo cliente OAuth do tipo "App de desktop" — loopback continua suportado
+para desktop — e usar Custom Tabs + PKCE com redirect http://127.0.0.1:porta.
+Por causa da verificação acima, o client_secret.com.json voltou ao formato
+original (sem redirect_uris) e o OAuthCallbackActivity/intent-filter foram
+removidos do projeto.
+
+O QUE CONFERIR NO GOOGLE CLOUD (SÓ O DONO DO PROJETO PODE FAZER)
+1. Google Drive API ativada ✓ (feito — a confirmação definitiva vem na
+   primeira chamada ao Drive: se não estiver ativa, o app recebe erro 403
+   com aviso claro de API desativada).
+2. Em Credenciais → "SE CESD - Backup Google Drive": conferir que o campo
+   "Nome do pacote" está br.org.secesd.debug e a impressão digital SHA-1 é
+   25:32:BE:B9:BD:65:7D:8C:92:22:5A:60:57:A7:5D:37:00:57:21:7D (build de
+   teste). Para a versão final, cadastre outro cliente Android com pacote
+   br.org.secesd e o SHA-1 da chave de produção.
+3. Tela de consentimento OAuth: modo Teste com a conta do usuário como
+   testadora; escopo .../auth/drive.file.
+
+GOOGLE DRIVE (INTEGRAÇÃO IMPLEMENTADA NO CÓDIGO — versão 1.1 / versionCode 2)
+Como o cliente OAuth é do tipo Android, o fluxo usa o GOOGLE PLAY SERVICES
+(sem navegador, sem redirect — exatamente para evitar os erros de bloqueio):
+  1. Autorização: GoogleSignIn.requestPermissions com o escopo drive.file
+     (o Play Services valida sozinho pacote + SHA-1 registrados no Cloud).
+  2. Token: GoogleAuthUtil.getToken, renovado automaticamente em caso de 401.
+  3. Pasta “SE • CESD” criada pelo próprio app no Drive do usuário, com o
+     arquivo único SE-CESD-backup.json: criado na primeira vez (POST
+     multipart) e depois SEMPRE atualizado no mesmo arquivo (PATCH media).
+  4. Conteúdo: o cofre do app (IndexedDB se-cesd-cofre) já vai criptografado
+     com AES-GCM pela senha do usuário — os parâmetros de proteção (sal e
+     verificador) viajam junto, então o backup abre em outro aparelho com a
+     MESMA senha. Nada é legível sem ela; em trânsito há TLS.
+  5. Restauração: baixa o backup, o usuário confirma em dois toques e os
+     registros voltam ao cofre, com recarga do app.
+
+NOVIDADES DO CÓDIGO (reconstructed/)
+  DriveOAuth.java           — client_id, escopo, nomes de pasta/arquivo, REST v3.
+  DriveBackupManager.java   — autorização (AccountManager/AccountPicker),
+                              upload (create/PATCH), download, retry em 401
+                              e erros amigáveis.
+  MainActivity.java         — injeta a ponte window.SecesoDrive no WebView e
+                              trata os resultados de autorização.
+  assets/web/drive-bridge.js — painel flutuante “Backup no Google Drive”,
+                              lê/grava o cofre IndexedDB, base64 ida e volta.
+  app/build.gradle          — sem dependências externas; versionCode 2 (1.1).
+  APK gerado: SE-CESD-1.1-drive.apk (ver detalhes no topo deste arquivo).
+
+REQUISITOS PARA O BACKUP FUNCIONAR
+  - Aparelho com Google Play Services (qualquer Android com Play Store).
+  - No Google Cloud: itens 2 e 3 de “O QUE CONFERIR NO GOOGLE CLOUD” acima.
+  - Recompilar o APK (Gradle 7.6+ / AGP 7.4.2, Android SDK 33) e instalá-lo.
+
+TESTE RECOMENDADO EM APARELHO FÍSICO
+  1. Criar acesso e alguns registros; abrir o painel de nuvem e “Enviar backup”.
+  2. Conferir no Drive: pasta “SE • CESD” → SE-CESD-backup.json.
+  3. Enviar de novo: o arquivo deve continuar ÚNICO (atualização, não cópia).
+  4. Apagar os dados do app e restaurar do Drive; entrar com a mesma senha.
+  5. Revogar o acesso em myaccount.google.com/permissions e tentar de novo
+     (o app deve pedir autorização novamente).
+
+APK NATIVO (NOVO — SE-CESD-nativo-v1.1.apk)
+Aplicativo Android NATIVO (sem WebView), mesmo pacote registrado no Google
+Cloud (br.org.secesd.debug) e MESMA assinatura (SHA-1 25:32:BE:...:21:7D):
+- Estrutura em 7 telas: Criar acesso/Entrar → Painel → Meu cadastro (com
+  fotografia), Minha trajetória (etapas por data), Memorial & Insígnia,
+  Galeria (até 4 fotos) e Backup no Google Drive.
+- Criptografia nativa: PBKDF2WithHmacSHA256 (120.000 iterações) + AES-256-GCM
+  (javax.crypto do próprio Android); cofre só existe cifrado no disco.
+- Backup no Drive: AccountManager/AccountPicker (consentimento do Play
+  Services) + Drive REST v3, pasta “SE • CESD”, arquivo único
+  SE-CESD-backup.json (create → PATCH), restauração com confirmação.
+- Zero dependências externas (build com framework android.jar API 33;
+  minSdk 26 / targetSdk 33; versionCode 2, versionName 1.1).
+- Código-fonte completo em nativo/ (src + res + AndroidManifest.xml).
+- Verificado: apksigner “Verifies” (v2+v3), aapt2 dump badging confirma
+  pacote, ícone e activity de lançamento.
+- Pode coexistir com o app WebView (pacote br.org.secesd); ambos podem usar
+  o mesmo backup no Drive (mesmo formato de cofre).
+- Observação: “GET_ACCOUNTS” é solicitado pelo seletor de contas em versões
+  antigas; nenhuma outra permissão é pedida.
+
+INSTALAÇÃO
+1. Transfira SE-CESD.apk para o Android.
+2. Abra o APK e permita temporariamente a instalação por essa fonte, se solicitado.
+3. Confirme a instalação.
+
+Se existir outro aplicativo com o mesmo pacote e assinatura diferente, pode ser necessário desinstalá-lo antes. A desinstalação apaga os dados locais desse aplicativo.
+
+VALIDAÇÃO
+Compilação concluída.
+Assinatura APK v2 verificada.
+Integridade ZIP do APK verificada.
+A instalação em aparelho físico ou emulador não foi realizada neste ambiente.
+A integração Google Drive ainda não foi incluída nesta versão.
