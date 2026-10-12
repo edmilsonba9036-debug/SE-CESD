@@ -21,7 +21,6 @@ public class AtividadePainel extends AtividadeBase {
     private android.widget.Button botaoMusica;
     private TextView textoMusica;
     private TextView dicaMusica;
-    private android.widget.Button botaoBaixarMusica;
     private android.widget.Button botaoListaMusica;
     private final android.os.Handler relogioMusica = new android.os.Handler();
 
@@ -178,14 +177,6 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(textoMusica, largura());
-        botaoBaixarMusica = botao("⬇  Baixar esta canção no Drive", false);
-        botaoBaixarMusica.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                baixarMusicaNoDrive();
-            }
-        });
-        cartaoMusica.addView(botaoBaixarMusica, largura());
         botaoListaMusica = botao("☰  Escolher canção do repertório", false);
         botaoListaMusica.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -194,7 +185,7 @@ public class AtividadePainel extends AtividadeBase {
             }
         });
         cartaoMusica.addView(botaoListaMusica, largura());
-        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher e buscar · ⬇ baixa");
+        dicaMusica = texto("▶ toca · toque no nome = próxima · ☰ escolher · ▶ YT Music pra variar");
         dicaMusica.setTextSize(12);
         dicaMusica.setGravity(android.view.Gravity.CENTER);
         cartaoMusica.addView(dicaMusica, largura());
@@ -312,9 +303,6 @@ public class AtividadePainel extends AtividadeBase {
         coluna.addView(cartao, largura());
     }
 
-    private void baixarMusicaNoDrive() {
-        iniciarDownload(PlayerMusicas.indiceAtual());
-    }
 
     /** Lista o repertório (com buscar na internet e YT Music no topo). */
     private void escolherMusica() {
@@ -325,73 +313,22 @@ public class AtividadePainel extends AtividadeBase {
                     android.widget.Toast.LENGTH_LONG).show();
             return;
         }
-        final String[] itens = new String[titulos.length + 2];
-        itens[0] = "🔎  Buscar canções na internet (digite o nome)";
-        itens[1] = "▶  Buscar no YouTube Music";
-        System.arraycopy(titulos, 0, itens, 2, titulos.length);
+        final String[] itens = new String[titulos.length + 1];
+        itens[0] = "▶  Buscar no YouTube Music";
+        System.arraycopy(titulos, 0, itens, 1, titulos.length);
         new android.app.AlertDialog.Builder(this)
                 .setTitle("Canções militares — " + titulos.length + " no repertório")
                 .setItems(itens, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
                         if (qual == 0) {
-                            dialogoBuscarInternet();
-                        } else if (qual == 1) {
                             dialogoBuscarYoutube();
                         } else {
-                            perguntarOuvirOuBaixar(qual - 2, titulos[qual - 2]);
+                            perguntarOuvirOuBaixar(qual - 1, titulos[qual - 1]);
                         }
                     }
                 })
                 .setNegativeButton("Fechar", null)
-                .show();
-    }
-
-    private void dialogoBuscarInternet() {
-        final android.widget.EditText campo = new android.widget.EditText(this);
-        campo.setHint("Ex.: dobrado militar, hino dos aviadores, feb…");
-        campo.setTextSize(16);
-        int p = px(20);
-        campo.setPadding(p, px(12), p, 0);
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("🔎 Buscar canções")
-                .setMessage("Digite o nome da canção ou o tipo (dobrado, hino, banda). "
-                        + "O app procura na internet, toca e deixa baixar pro Drive.")
-                .setView(campo)
-                .setPositiveButton("Buscar", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        final String termo = campo.getText().toString().trim();
-                        if (termo.isEmpty()) return;
-                        android.widget.Toast.makeText(AtividadePainel.this,
-                                "Procurando “" + termo + "”…",
-                                android.widget.Toast.LENGTH_SHORT).show();
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                final int n = PlayerMusicas.buscarTermo(termo);
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        if (n == 0) {
-                                            android.widget.Toast.makeText(AtividadePainel.this,
-                                                    "Nada encontrado com esse termo agora. "
-                                                            + "Tente outra palavra ou use o YT Music.",
-                                                    android.widget.Toast.LENGTH_LONG).show();
-                                        } else {
-                                            android.widget.Toast.makeText(AtividadePainel.this,
-                                                    n + " canções encontradas ✓",
-                                                    android.widget.Toast.LENGTH_SHORT).show();
-                                            atualizarMusica();
-                                            escolherMusica();
-                                        }
-                                    }
-                                });
-                            }
-                        }).start();
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
                 .show();
     }
 
@@ -429,18 +366,13 @@ public class AtividadePainel extends AtividadeBase {
                         atualizarMusica();
                     }
                 })
-                .setNegativeButton("Baixar no Drive", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        iniciarDownload(faixa);
-                    }
-                })
-                .setNeutralButton("▶ YT Music", new DialogInterface.OnClickListener() {
+                .setNegativeButton("▶ YT Music", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
                         abrirNoYoutubeMusic(titulo);
                     }
                 })
+                .setNeutralButton("Cancelar", null)
                 .show();
     }
 
@@ -456,79 +388,6 @@ public class AtividadePainel extends AtividadeBase {
                     "Não achei o YouTube Music — instale o app dele ou use o navegador.",
                     android.widget.Toast.LENGTH_LONG).show();
         }
-    }
-
-    private void iniciarDownload(final int faixa) {
-        final String titulo = PlayerMusicas.tituloEm(faixa);
-        final String url = PlayerMusicas.urlEm(faixa);
-        if (url == null || titulo == null || titulo.isEmpty()) {
-            android.widget.Toast.makeText(this,
-                    "Toque ▶ e deixe uma canção tocar antes de baixar.",
-                    android.widget.Toast.LENGTH_LONG).show();
-            return;
-        }
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Baixar no Drive?")
-                .setMessage("“" + titulo + "” vai para a pasta Canções Militares "
-                        + "no seu Google Drive (a mesma conta do backup).")
-                .setPositiveButton("Baixar", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface d, int qual) {
-                        botaoBaixarMusica.setEnabled(false);
-                        botaoBaixarMusica.setText("⬇  Baixando…");
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                String fim;
-                                try {
-                                    String fonte = url;
-                                    byte[] bytes = null;
-                                    try {
-                                        bytes = PlayerMusicas.baixarBytes(url, 15000, 60000);
-                                    } catch (Exception ign) { bytes = null; }
-                                    String reserva = PlayerMusicas.urlFallbackEm(faixa);
-                                    if ((bytes == null || bytes.length < 1000)
-                                            && reserva != null && !reserva.isEmpty()) {
-                                        bytes = PlayerMusicas.baixarBytes(reserva, 15000, 60000);
-                                        fonte = reserva;
-                                    }
-                                    if (bytes == null || bytes.length < 1000) {
-                                        fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";
-                                    } else {
-                                        String mime = fonte.toLowerCase().contains(".ogg")
-                                                ? "audio/ogg" : "audio/mpeg";
-                                        fim = DriveBackup.enviarMusica(AtividadePainel.this,
-                                                nomeArquivoSeguro(titulo, fonte), bytes, mime);
-                                    }
-                                } catch (Exception e) {
-                                    fim = "Não consegui baixar da fonte agora. Tente de novo em instantes.";
-                                }
-                                final String msg = fim;
-                                runOnUiThread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        botaoBaixarMusica.setEnabled(true);
-                                        botaoBaixarMusica.setText("⬇  Baixar esta canção no Drive");
-                                        android.widget.Toast.makeText(AtividadePainel.this,
-                                                msg == null
-                                                        ? "✓ Enviada! Veja a pasta Canções Militares no seu Drive."
-                                                        : msg,
-                                                android.widget.Toast.LENGTH_LONG).show();
-                                    }
-                                });
-                            }
-                        }).start();
-                    }
-                })
-                .setNegativeButton("Cancelar", null)
-                .show();
-    }
-
-    private static String nomeArquivoSeguro(String titulo, String url) {
-        String t = titulo.replace(" — ", " - ").trim();
-        t = t.replaceAll("[\\/:*?\"<>|]", "").trim();
-        if (t.length() > 70) t = t.substring(0, 70).trim();
-        return t + (url.toLowerCase().contains(".ogg") ? ".ogg" : ".mp3");
     }
 
     private void confirmarApagar() {
