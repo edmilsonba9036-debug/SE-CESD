@@ -170,6 +170,19 @@ public class AtividadePainel extends AtividadeBase {
         linhaFim.addView(apagar, metade2);
         coluna.addView(linhaFim, largura());
 
+        // LETREIRO DA VERSÃO — prova viva de qual build está no aparelho
+        TextView versaoRodape = texto("");
+        try {
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            versaoRodape.setText("SE • CESD versão " + v);
+        } catch (Exception e) {
+            versaoRodape.setText("SE • CESD");
+        }
+        versaoRodape.setTextSize(11);
+        versaoRodape.setGravity(android.view.Gravity.CENTER);
+        versaoRodape.setPadding(0, px(14), 0, 0);
+        coluna.addView(versaoRodape, largura());
+
         TextView rodape = new TextView(this);
         rodape.setText("CÉU • HONRA • MISSÃO\nBrasília • Brasil — Céu de todos nós");
         rodape.setTextColor(0xFF9DB0CC);
