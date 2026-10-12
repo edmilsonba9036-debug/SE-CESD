@@ -119,6 +119,32 @@ public final class BancoMusicas {
             ""
     };
 
+    /**
+     * SUGESTÕES curadas para ouvir no YouTube Music — links VERIFICADOS
+     * (vídeos vivos em 02/10/2026). Tocar/baixar é pelo app oficial.
+     */
+    private static final String[] SUGESTOES_TITULOS = {
+            "Ardor do Infante — Infantaria do Exército",
+            "Nobre Infantaria — Infantaria do Exército",
+            "Hino a Caxias — Exército",
+            "Canção da AMAN — Agulhas Negras",
+            "Marcha da Despedida — FAB/EEAR",
+            "Aviação de Transporte de Tropa — FAB",
+            "Dobrado Brasília — Banda da FAB (CINDACTA II)",
+            "Playlist: Dobrados e Hinos Militares (56 faixas)"
+    };
+
+    private static final String[] SUGESTOES_LINKS = {
+            "https://music.youtube.com/watch?v=JEyEdi7Kf3Y",
+            "https://music.youtube.com/watch?v=QP5uXGLBWMM",
+            "https://music.youtube.com/watch?v=1kAul-eQNlY",
+            "https://music.youtube.com/watch?v=R9fzOK9c5UU",
+            "https://music.youtube.com/watch?v=VbudcLdsaA4",
+            "https://music.youtube.com/watch?v=bjPSUl8pr5M",
+            "https://music.youtube.com/watch?v=3PPcRPEISiA",
+            "https://music.youtube.com/playlist?list=PLHHgcpF3ODBpODQHPCPgGlg5yHVPnvVvm"
+    };
+
     private BancoMusicas() {}
 
     public static int total() {
@@ -135,5 +161,13 @@ public final class BancoMusicas {
 
     public static String[] fallbacks() {
         return FALLBACKS.clone();
+    }
+
+    public static String[] sugestoesTitulos() {
+        return SUGESTOES_TITULOS.clone();
+    }
+
+    public static String[] sugestoesLinks() {
+        return SUGESTOES_LINKS.clone();
     }
 }

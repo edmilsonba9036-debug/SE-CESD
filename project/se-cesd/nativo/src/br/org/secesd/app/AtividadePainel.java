@@ -313,23 +313,44 @@ public class AtividadePainel extends AtividadeBase {
                     android.widget.Toast.LENGTH_LONG).show();
             return;
         }
-        final String[] itens = new String[titulos.length + 1];
-        itens[0] = "▶  Buscar no YouTube Music";
-        System.arraycopy(titulos, 0, itens, 1, titulos.length);
+        final String[] base = new String[titulos.length + 1];
+        base[0] = "▶  Buscar no YouTube Music";
+        System.arraycopy(titulos, 0, base, 1, titulos.length);
+        final String[] sugT = BancoMusicas.sugestoesTitulos();
+        final String[] sugL = BancoMusicas.sugestoesLinks();
+        final String[] itens = new String[base.length + sugT.length];
+        System.arraycopy(base, 0, itens, 0, base.length);
+        for (int i = 0; i < sugT.length; i++) {
+            itens[base.length + i] = "⭐  " + sugT[i] + "  (YT Music)";
+        }
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Canções militares — " + titulos.length + " no repertório")
+                .setTitle("Canções militares — " + titulos.length
+                        + " no repertório + " + sugT.length + " sugestões")
                 .setItems(itens, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int qual) {
                         if (qual == 0) {
                             dialogoBuscarYoutube();
-                        } else {
+                        } else if (qual <= titulos.length) {
                             perguntarOuvirOuBaixar(qual - 1, titulos[qual - 1]);
+                        } else {
+                            abrirNoYoutubeMusicLink(sugL[qual - base.length]);
                         }
                     }
                 })
                 .setNegativeButton("Fechar", null)
                 .show();
+    }
+
+    /** Abre um link direto (canção/playlist) no YouTube Music oficial. */
+    private void abrirNoYoutubeMusicLink(String link) {
+        try {
+            startActivity(new Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link)));
+        } catch (Exception e) {
+            android.widget.Toast.makeText(this,
+                    "Não achei o YouTube Music — instale o app dele ou use o navegador.",
+                    android.widget.Toast.LENGTH_LONG).show();
+        }
     }
 
     private void dialogoBuscarYoutube() {
